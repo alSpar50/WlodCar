@@ -23,6 +23,7 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(opt =>
 {
     opt.SignIn.RequireConfirmedAccount = false;
 })
+ .AddPasswordValidator<DomainPasswordValidator>()
 .AddEntityFrameworkStores<ApplicationDbContext>()
 .AddDefaultTokenProviders();
 
@@ -49,6 +50,8 @@ builder.Services.AddScoped<IReservationService, ReservationService>();
 builder.Services.AddScoped<ILoyaltyService, LoyaltyService>();
 
 builder.Services.AddSingleton<IEmailSender<ApplicationUser>, ConsoleEmailSender>();
+
+
 
 //builder.Services.AddSingleton<
 // IEmailSender<ApplicationUser>,

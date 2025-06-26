@@ -23,10 +23,13 @@
 
 <StatusMessage Message="@Message" />
 
-<EditForm Model="Input" FormName="register" OnValidSubmit="RegisterUser">
+<EditForm Model="Input"
+          FormName="register"
+          OnValidSubmit="RegisterUser">
     <DataAnnotationsValidator />
     <ValidationSummary class="text-danger mb-3" />
 
+    <!-- e-mail -->
     <div class="form-floating mb-3">
         <InputText id="Input.Email"
                    class="form-control"
@@ -39,6 +42,7 @@
         <ValidationMessage For="() => Input.Email" class="text-danger" />
     </div>
 
+    <!-- hasło -->
     <div class="form-floating mb-3">
         <InputText id="Input.Password"
                    type="password"
@@ -47,11 +51,12 @@
                    autocomplete="new-password"
                    @bind-Value="Input.Password" />
         <label for="Input.Password">
-            <i class="bi bi-lock me-2"></i>Hasło (min. 6 znaków)
+            <i class="bi bi-lock me-2"></i>Hasło (min. 6 znaków,<br />admin 12)
         </label>
         <ValidationMessage For="() => Input.Password" class="text-danger" />
     </div>
 
+    <!-- powtórz hasło -->
     <div class="form-floating mb-4">
         <InputText id="Input.ConfirmPassword"
                    type="password"
@@ -65,7 +70,9 @@
         <ValidationMessage For="() => Input.ConfirmPassword" class="text-danger" />
     </div>
 
-    <button type="submit" class="btn btn-wc-orange w-100 py-2">Zarejestruj się</button>
+    <button type="submit" class="btn btn-wc-orange w-100 py-2">
+        Zarejestruj się
+    </button>
 
     <div class="text-center small mt-3">
         Masz już konto? <a href="Account/Login">Zaloguj się</a>
@@ -73,22 +80,24 @@
 </EditForm>
 
 @code {
-    private IEnumerable<IdentityError>? identityErrors;
-
+    /* --------------------- DICTATED BY FORM --------------------- */
     [SupplyParameterFromForm] private InputModel Input { get; set; } = new();
     [SupplyParameterFromQuery] private string? ReturnUrl { get; set; }
 
+    private IEnumerable<IdentityError>? identityErrors;
     private string? Message =>
         identityErrors is null ? null
         : $"Błąd: {string.Join(", ", identityErrors.Select(e => e.Description))}";
 
-    public async Task RegisterUser(EditContext _)
+    /* --------------------- rejestracja -------------------------- */
+    private async Task RegisterUser(EditContext _)
     {
         var user = CreateUser();
 
         await UserStore.SetUserNameAsync(user, Input.Email, CancellationToken.None);
         var emailStore = GetEmailStore();
         await emailStore.SetEmailAsync(user, Input.Email, CancellationToken.None);
+
         var result = await UserManager.CreateAsync(user, Input.Password);
 
         if (!result.Succeeded)
@@ -97,31 +106,56 @@
             return;
         }
 
-        Logger.LogInformation("User created a new account with password.");
+        /* ---------- przypisanie roli -------------------------------- */
+        string role = "Client";
+        if (Input.Email.EndsWith("@wlodcar.pl", StringComparison.OrdinalIgnoreCase))
+        {
+            role = Input.Email.Equals("admin@wlodcar.pl",
+                        StringComparison.OrdinalIgnoreCase)
+                   ? "Admin"
+                   : "Staff";
+        }
 
+        await UserManager.AddToRoleAsync(user, role);
+
+        Logger.LogInformation("New user registered ({Email}) as {Role}.",
+                              Input.Email, role);
+
+        /* ---------- e-mail potwierdzający --------------------------- */
         var userId = await UserManager.GetUserIdAsync(user);
         var code = await UserManager.GenerateEmailConfirmationTokenAsync(user);
         code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
 
         var callbackUrl = NavigationManager.GetUriWithQueryParameters(
-            "Account/ConfirmEmail",
-            new Dictionary<string, object?> { ["userId"] = userId, ["code"] = code, ["returnUrl"] = ReturnUrl });
+     "Account/ConfirmEmail",
+     new Dictionary<string, object?>      // dodane
+         {
+             ["userId"] = userId,
+             ["code"] = code,
+             ["returnUrl"] = ReturnUrl
+         });
 
         await EmailSender.SendConfirmationLinkAsync(
             user, Input.Email, HtmlEncoder.Default.Encode(callbackUrl));
 
+        /* ---------- logowanie / redirect --------------------------- */
         if (UserManager.Options.SignIn.RequireConfirmedAccount)
         {
             RedirectManager.RedirectTo(
-                "Account/RegisterConfirmation",
-                new() { ["email"] = Input.Email, ["returnUrl"] = ReturnUrl });
+    "Account/RegisterConfirmation",
+    new Dictionary<string, object?>            
+        {
+            ["email"] = Input.Email,
+            ["returnUrl"] = ReturnUrl
+        });
+
         }
 
         await SignInManager.SignInAsync(user, isPersistent: false);
         RedirectManager.RedirectTo(ReturnUrl);
     }
 
-    /* helpers --------------------------------------------------------- */
+    /* --------------------- helpers ------------------------------- */
     private ApplicationUser CreateUser()
         => Activator.CreateInstance<ApplicationUser>()
            ?? throw new InvalidOperationException($"Can't create '{nameof(ApplicationUser)}'.");
@@ -134,7 +168,8 @@
     private sealed class InputModel
     {
         [Required, EmailAddress] public string Email { get; set; } = "";
-        [Required, StringLength(100, MinimumLength = 6)] public string Password { get; set; } = "";
+        [Required, StringLength(100, MinimumLength = 6)]
+        public string Password { get; set; } = "";
         [Compare("Password", ErrorMessage = "Hasła nie są identyczne.")]
         public string ConfirmPassword { get; set; } = "";
     }
