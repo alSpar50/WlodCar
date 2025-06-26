@@ -1,0 +1,219 @@
+﻿/* KOLORY MARKI */
+:root {
+    --wc-orange: #ff7b00;
+    --wc-navy: #002c5c;
+    --wc-navy-dark: #001b38;
+}
+
+/* HERO */
+.wc-hero {
+    height: 520px
+}
+
+    .wc-hero img {
+        filter: brightness(.55)
+    }
+
+.wc-hero-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+/* SEARCH BAR */
+.wc-search .form-control, .wc-search .form-select {
+    min-width: 140px
+}
+
+/* PROMOCJE */
+.wc-promo-text {
+    background: var(--wc-navy);
+    color: #fff;
+    padding: 3rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: center
+}
+
+.bg-info-soft {
+    background: #0d6efd21 !important;
+    color: #0d6efd !important
+}
+
+.object-cover {
+    object-fit: cover;
+    object-position: center
+}
+
+/* BUTTON */
+.btn-wc-orange {
+    background: var(--wc-orange);
+    color: #fff;
+    border: none
+}
+
+    .btn-wc-orange:hover {
+        background: #e46e00;
+        color: #fff
+    }
+/* STOPKA */
+.wc-footer {
+    background: #002c5c;
+}
+
+.wc-footer-bar {
+    background: #001b38;
+    font-size: .85rem;
+}
+
+.wc-footer-link {
+    color: #cfd9f2;
+    text-decoration: none;
+}
+
+    .wc-footer-link:hover {
+        color: #fff;
+        text-decoration: underline;
+    }
+
+.fs-sm {
+    font-size: .9rem
+}
+
+/* === KALKULATOR ===================================================== */
+.calc-box {
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+}
+
+    .calc-box .form-range::-webkit-slider-thumb {
+        background: var(--wc-navy)
+    }
+
+    .calc-box .form-label {
+        font-size: .9rem
+    }
+
+.calc-offer {
+    background: #fff;
+}
+
+    .calc-offer .offer-img {
+        width: 160px;
+        height: 120px;
+        object-fit: cover;
+        object-position: center
+    }
+
+.text-wc-navy {
+    color: var(--wc-navy);
+}
+
+/* === KONTAKT ======================================================= */
+.contact-map {
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.contact-card {
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    padding: 2rem;
+    border-radius: .5rem;
+}
+
+    .contact-card .form-label {
+        font-size: .9rem
+    }
+
+/* === AUTH ============================================================ */
+.auth-wrapper {
+    min-height: 100vh;
+    background: #f5f7fb;
+}
+
+.auth-card {
+    width: 100%;
+    max-width: 420px;
+    background: #fff;
+    padding: 2.5rem 2rem;
+    border-radius: .75rem;
+}
+
+    .auth-card h1,
+    .auth-card h3 {
+        font-weight: 700;
+        color: var(--wc-navy);
+        margin-bottom: 1.5rem;
+    }
+
+    .auth-card .form-label {
+        font-size: .9rem;
+    }
+
+    .auth-card .form-control {
+        padding: .6rem .75rem;
+    }
+
+/* === MANAGE ========================================================== */
+.manage-content {
+    background: #fff;
+}
+
+.manage-nav a.nav-link.active {
+    color: var(--wc-orange) !important;
+}
+
+.avatar-lg {
+    width: 140px;
+    height: 140px;
+    object-fit: cover;
+}
+
+.text-wc-orange {
+    color: var(--wc-orange);
+}
+
+/* === AUTH v2 ======================================================= */
+.auth-page {
+    min-height: 100vh;
+    background: #f5f7fb
+}
+
+.auth-card {
+    max-width: 880px;
+    background: #fff
+}
+
+.auth-cover {
+    width: 45%;
+    background: #002c5c
+}
+
+.auth-title {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--wc-navy);
+    margin-bottom: 1.5rem
+}
+
+.form-floating > .form-control:not(:placeholder-shown) ~ label {
+    opacity: .65;
+    transform: scale(.85) translateY(-.5rem) translateX(.15rem)
+}
+
+/* === KONTAKT =============================================== */
+.contact-icon {
+    width: 36px;
+    height: 36px;
+    background: var(--wc-navy);
+    color: #fff;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+}

@@ -1,0 +1,213 @@
+﻿@page "/calculator/confirm"
+@attribute [Authorize]
+@rendermode InteractiveServer
+
+@using System.ComponentModel.DataAnnotations
+@using System.Security.Claims
+@using DbReservation = WlodCar.Data.Entities.Reservation
+@using WlodCar.Data.Entities
+@using WlodCar.Services
+@inject ReservationState               State
+@inject IReservationService            ReservationService
+@inject UserManager<ApplicationUser>   UserManager
+@inject AuthenticationStateProvider    Auth
+@inject NavigationManager              Nav
+
+<PageTitle>Potwierdzenie rezerwacji – WlodCar</PageTitle>
+
+@if (redirect)
+{
+    <p>Przekierowuję…</p>
+}
+else
+{
+    <h4 class="fw-bold mb-3">Potwierdź dane</h4>
+
+    @if (error is not null)
+    {
+        <div class="alert alert-danger">@error</div>
+    }
+
+    <div class="row g-4">
+        <!-- ◄◄ FORMULARZ KIEROWCY -->
+        <div class="col-lg-8">
+            <EditForm Model="@M" OnValidSubmit="Save" FormName="calc-confirm">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label>Imię</label>
+                        <InputText class="form-control" @bind-Value="M.First" />
+                    </div>
+                    <div class="col-md-6">
+                        <label>Nazwisko</label>
+                        <InputText class="form-control" @bind-Value="M.Last" />
+                    </div>
+                    <div class="col-md-6">
+                        <label>Telefon</label>
+                        <InputText class="form-control" @bind-Value="M.Phone" />
+                    </div>
+                    <div class="col-md-6">
+                        <label>Email</label>
+                        <InputText class="form-control" @bind-Value="M.Email" />
+                    </div>
+                    <div class="col-md-6">
+                        <label>Nr prawa jazdy</label>
+                        <InputText class="form-control" @bind-Value="M.Licence" />
+                    </div>
+                </div>
+
+                @* ─────────────────────────────  SUWAK PUNKTÓW  ───────────────────────────── *@
+                @if (pointsAvailable >= 10)
+                {
+                    <div class="mt-4">
+                        <label class="form-label small">
+                            Wykorzystaj punkty lojalnościowe
+                            <span class="text-muted">(10 pkt = 1 % rabatu)</span>
+                        </label>
+
+                        <input type="range"
+                               class="form-range"
+                               min="0"
+                               max="@pointsAvailable"
+                               step="10"
+                               @bind="pointsToUse" />
+
+                        <div class="small">
+                            Używasz <b>@pointsToUse</b> pkt
+                            (rabat <b>@DiscountPercent</b>%,
+                            oszczędzasz <b>@DiscountAmount.ToString("0.00")</b> PLN)
+                        </div>
+                    </div>
+                }
+
+                <button class="btn btn-success mt-4 w-100">Rezerwuj</button>
+            </EditForm>
+
+            @if (saved)
+            {
+                <div class="alert alert-success mt-3">
+                    Rezerwacja przyjęta – dziękujemy!
+                </div>
+            }
+        </div>
+
+        <!-- ◄◄ PODSUMOWANIE -->
+        <div class="col-lg-4">
+            <h6>Podsumowanie</h6>
+
+            <div class="card mb-3">
+                <img src="@State.SelectedCar!.Img"
+                     class="card-img-top"
+                     style="height:160px;object-fit:cover;" />
+                <div class="card-body p-2">
+                    <strong>@State.SelectedCar.Name</strong><br />
+                    <small class="text-muted">
+                        @State.SelectedCar.PricePerDay PLN / doba
+                    </small>
+                </div>
+            </div>
+
+            <ul class="list-unstyled small">
+                <li><b>Termin:</b> @State.PickupDate:dd.MM.yyyy → @State.ReturnDate:dd.MM.yyyy</li>
+                @foreach (var ex in State.Extras)
+                {
+                    <li>+ @ex.Name (@ex.Price PLN / doba)</li>
+                }
+            </ul>
+
+            <hr />
+            <p><b>Łączny koszt przed rabatem:</b><br />@Total.ToString("0.00") PLN</p>
+            <p><b>Łączny koszt po rabacie:</b><br />@FinalTotal.ToString("0.00") PLN</p>
+        </div>
+    </div>
+
+    <button class="btn btn-outline-secondary mt-3"
+            @onclick="@(() => Nav.NavigateTo("/calculator"))">
+        Wstecz
+    </button>
+}
+
+@code {
+    /* --- ochrona przed wejściem „na pusto” --- */
+    private bool redirect;
+
+    /* --- formularz kierowcy --- */
+    private readonly DriverModel M = new();
+
+    /* --- punkty lojalnościowe --- */
+    private int pointsAvailable;
+    private int pointsToUse;
+
+    /* --- status zapisu --- */
+    private bool saved;
+    private string? error;
+
+    /* --- obliczenia --- */
+    private int Days           => Math.Max(1, (State.ReturnDate - State.PickupDate)!.Value.Days);
+    private decimal ExtrasPerDay => State.Extras.Sum(e => e.Price);
+    private decimal Total         => (State.SelectedCar!.PricePerDay + ExtrasPerDay) * Days;
+
+    private decimal DiscountPercent => pointsToUse / 10m;
+    private decimal DiscountAmount  => Total * DiscountPercent / 100;
+    private decimal FinalTotal      => Total - DiscountAmount;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (State.SelectedCar is null || State.PickupDate is null || State.ReturnDate is null)
+        {
+            redirect = true;
+            Nav.NavigateTo("/calculator");
+            return;
+        }
+
+        var auth = await Auth.GetAuthenticationStateAsync();
+        var user = await UserManager.GetUserAsync(auth.User);
+        pointsAvailable = user?.LoyaltyPoints ?? 0;
+    }
+
+    private async Task Save()
+    {
+        error = null;
+        saved = false;
+
+        try
+        {
+            var auth   = await Auth.GetAuthenticationStateAsync();
+            var userId = auth.User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (userId is null)
+            {
+                error = "Brak identyfikatora użytkownika.";
+                return;
+            }
+
+            var reservation = new DbReservation
+            {
+                UserId     = Guid.Parse(userId),
+                CarId      = State.SelectedCar!.Id,
+                DateFrom   = State.PickupDate!.Value,
+                DateTo     = State.ReturnDate!.Value,
+                TotalPrice = FinalTotal
+            };
+
+            await ReservationService.CreateAsync(reservation, pointsToUse);
+
+            saved = true;   // ►► sukces
+        }
+        catch (Exception ex)
+        {
+            error = "Błąd: " + ex.GetBaseException().Message;
+        }
+    }
+
+    /* --- DTO --- */
+    private sealed class DriverModel
+    {
+        [Required] public string? First   { get; set; }
+        [Required] public string? Last    { get; set; }
+        [Required] public string? Phone   { get; set; }
+        [Required, EmailAddress] public string? Email   { get; set; }
+        [Required] public string? Licence { get; set; }
+    }
+}

@@ -1,0 +1,23 @@
+﻿@using WlodCar.Components.Account.Shared
+@inherits LayoutComponentBase
+
+
+<div class="page-shell d-flex flex-column min-vh-100">
+
+    <!-- GÓRNY PASEK NAWIGACJI -->
+    <header>
+        <NavMenu />
+    </header>
+
+    <!-- TREŚĆ STRONY (rozciąga się) -->
+    <main class="flex-grow-1">
+        <article class="content px-4">
+            @Body
+        </article>
+    </main>
+
+    <!-- STOPKA – doklejona do spodu -->
+    <Footer />
+
+</div>
+

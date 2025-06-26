@@ -1,0 +1,84 @@
+﻿@page "/contact"
+@using System.ComponentModel.DataAnnotations
+
+<PageTitle>Kontakt – WlodCar</PageTitle>
+
+<section class="container my-5">
+
+    <!-- ---------- Nagłówek ------------------------------------------------ -->
+    <h2 class="fw-bold display-6 text-wc-navy mb-2">Skontaktuj się z nami</h2>
+    <p class="text-muted mb-4 col-lg-8">
+        Zadzwoń, napisz lub odwiedź jeden z naszych oddziałów. Jesteśmy
+        do Twojej dyspozycji od&nbsp;poniedziałku do&nbsp;piątku 8-18.
+    </p>
+
+    <!-- ---------- DANE ↔ MAPA --------------------------------------------- -->
+    <div class="row gy-5">
+
+        <!-- kolumna LEWA: dane kontaktowe -->
+        <div class="col-lg-6 order-lg-1">
+
+            <!-- telefon / mail ------------------------------------------------ -->
+            <ul class="list-unstyled mb-5">
+                <li class="d-flex align-items-start gap-3 mb-2">
+                    <span class="contact-icon"><i class="bi bi-telephone-fill"></i></span>
+                    <span class="fs-5 fw-medium">+48&nbsp;661&nbsp;121&nbsp;122</span>
+                </li>
+                <li class="d-flex align-items-start gap-3">
+                    <span class="contact-icon"><i class="bi bi-envelope-fill"></i></span>
+                    <span class="fs-5 fw-medium">bok@wlodcar.pl</span>
+                </li>
+            </ul>
+
+            <!-- adresy --------------------------------------------------------- -->
+            <div class="mb-4">
+                <h4 class="fw-bold">Centrala</h4>
+                <address>
+                    Al.&nbsp;Kilińskiego&nbsp;12<br />
+                    09-402&nbsp;Płock
+                </address>
+            </div>
+
+            <div class="mb-4">
+                <h4 class="fw-bold">Oddział Iława</h4>
+                <address>
+                    ul.&nbsp;Kościuszki&nbsp;18<br />
+                    14-200&nbsp;Iława
+                </address>
+            </div>
+
+            <div class="mb-4">
+                <h4 class="fw-bold">Oddział Wyszków</h4>
+                <address>
+                    ul.&nbsp;Geodetów&nbsp;45a<br />
+                    07-200&nbsp;Wyszków
+                </address>
+            </div>
+
+            <!-- dane rejestrowe ----------------------------------------------- -->
+            <p class="mt-4 small">
+                <strong>KRS:</strong> 0001234567<br />
+                <strong>NIP:</strong> 123-456-78-90<br />
+                <strong>REGON:</strong> 123456789
+            </p>
+        </div>
+
+        <!-- kolumna PRAWA: mapa ---------------------------------------------- -->
+        <div class="col-lg-6 order-lg-2">
+            <div class="ratio ratio-4x3 contact-map">
+                <iframe src="https://www.openstreetmap.org/export/embed.html?bbox=19.704625904560093%2C52.54362875907722%2C19.709861576557163%2C52.54568239758561&amp;layer=mapnik&amp;marker=52.54465477475856%2C19.707243740558624"
+                        title="Lokalizacja WlodCar – Płock"
+                        style="border:1px solid #000"
+                        loading="lazy">
+                </iframe>
+            </div>
+            <small>
+                <a target="_blank"
+                   href="https://www.openstreetmap.org/?mlat=52.544655&amp;mlon=19.707244#map=19/52.544656/19.707244">
+                    Wyświetl większą mapę
+                </a>
+            </small>
+        </div>
+
+    </div>
+</section>

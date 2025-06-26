@@ -1,0 +1,96 @@
+﻿@implements IDisposable
+@inject NavigationManager NavigationManager
+
+<!-- ░░░ GÓRNY PASEK: logo + Logowanie/Rejestracja ░░░ -->
+<header class="border-bottom">
+    <div class="container d-flex justify-content-between align-items-center py-1">
+        <!-- logo → kliknięcie wraca na “/” -->
+        <a class="d-inline-block" href="/">
+            <img src="images/logo.png" alt="WlodCar" height="32" />
+        </a>
+
+        <AuthorizeView>
+            <Authorized>
+                <NavLink class="nav-link" href="Account/Manage">Moje konto</NavLink>
+                <NavLink class="nav-link" href="/Account/Logout">Wyloguj</NavLink>
+            </Authorized>
+
+            <NotAuthorized>
+                <NavLink class="nav-link" href="Account/Login">Logowanie</NavLink>
+                <NavLink class="nav-link" href="Account/Register">Rejestracja</NavLink>
+            </NotAuthorized>
+        </AuthorizeView>
+    </div>
+</header>
+
+<!-- ░░░ WŁAŚCIWY NAVBAR ░░░ -->
+<nav class="border-bottom">
+    <div class="container">
+        <!-- navbar-expand-lg = pełny na desktopie, hamburger na mobile -->
+        <nav class="navbar navbar-expand-lg navbar-light px-0">
+            <button class="navbar-toggler" type="button"
+                    data-bs-toggle="collapse" data-bs-target="#mainNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+
+            <div class="collapse navbar-collapse justify-content-center" id="mainNav">
+                <ul class="navbar-nav fw-semibold gap-lg-5">
+                    <li class="nav-item">
+                        <NavLink class="nav-link" href="/" Match="NavLinkMatch.All">
+                            Strona główna
+                        </NavLink>
+                    </li>
+                    <li class="nav-item">
+                        <NavLink class="nav-link" href="/calculator">
+                            Kalkulator
+                        </NavLink>
+                    </li>
+                    <AuthorizeView>
+                        <Authorized>
+                            <li class="nav-item">
+                                <NavLink class="nav-link" href="/rezerwacja">
+                                    Rezerwacja
+                                </NavLink>
+                            </li>
+                            <li class="nav-item">
+                                <NavLink class="nav-link" href="/moje-rezerwacje">
+                                    Moje Rezerwacje
+                                </NavLink>
+                            </li>
+                        </Authorized>
+                        
+                    </AuthorizeView>
+                    <li class="nav-item">
+                        <NavLink class="nav-link" href="/offer">
+                            Oferta
+                        </NavLink>
+                    </li>
+                    <li class="nav-item">
+                        <NavLink class="nav-link" href="/contact">
+                            Kontakt
+                        </NavLink>
+                    </li>
+                </ul>
+            </div>
+        </nav>
+    </div>
+</nav>
+
+@code {
+    private string? currentUrl;
+
+    protected override void OnInitialized()
+    {
+        currentUrl = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
+        NavigationManager.LocationChanged += OnLocationChanged;
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        currentUrl = NavigationManager.ToBaseRelativePath(e.Location);
+        StateHasChanged();
+    }
+
+    public void Dispose() => NavigationManager.LocationChanged -= OnLocationChanged;
+}
+

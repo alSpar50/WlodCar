@@ -1,0 +1,112 @@
+﻿@page "/moje-rezerwacje"
+@attribute [Authorize]
+@rendermode InteractiveServer
+
+@using WlodCar.Services
+@using WlodCar.Data.Entities
+@using System.Security.Claims
+@using DbReservation = WlodCar.Data.Entities.Reservation
+
+@inject IReservationService ReservationService
+@inject AuthenticationStateProvider Auth
+
+<PageTitle>Moje rezerwacje</PageTitle>
+
+<h3 class="mb-4">Moje rezerwacje</h3>
+
+@if (list is null)
+{
+    <p><span class="spinner-border spinner-border-sm me-2"></span>Ładuję…</p>
+}
+else if (!list.Any())
+{
+    <div class="alert alert-info">Nie masz jeszcze żadnych rezerwacji.</div>
+}
+else
+{
+    <!-- AKTYWNE -->
+    <h5>Aktywne</h5>
+    <table class="table table-sm table-striped align-middle">
+        <thead>
+            <tr>
+                <th>Samochód</th>
+                <th>Od</th>
+                <th>Do</th>
+                <th class="text-center">Akcje</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var r in list.Where(x => x.Status == ReservationStatus.Active))
+            {
+                <tr>
+                    <td>@r.CarId</td>
+                    <td>@r.DateFrom:dd.MM.yyyy</td>
+                    <td>@r.DateTo:dd.MM.yyyy</td>
+                    <td class="text-center">
+                        <button class="btn btn-outline-danger btn-sm"
+                                disabled="@busyId.Contains(r.Id)"
+                                @onclick="() => Cancel(r.Id)">
+                            Anuluj
+                        </button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <!-- ZAKOŃCZONE / ANULOWANE -->
+    <h5 class="mt-4">Historia</h5>
+    <table class="table table-sm table-striped">
+        <thead>
+            <tr>
+                <th>Samochód</th>
+                <th>Od</th>
+                <th>Do</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var r in list.Where(x => x.Status != ReservationStatus.Active))
+            {
+                <tr>
+                    <td>@r.CarId</td>
+                    <td>@r.DateFrom:dd.MM.yyyy</td>
+                    <td>@r.DateTo:dd.MM.yyyy</td>
+                    <td>@r.Status</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<DbReservation>? list;
+    private readonly HashSet<int> busyId = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        list = await LoadAsync();
+    }
+
+    private async Task<List<DbReservation>> LoadAsync()
+    {
+        var auth = await Auth.GetAuthenticationStateAsync();
+        var userId = Guid.Parse(auth.User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+        return await ReservationService.GetForUserAsync(userId);
+    }
+
+    private async Task Cancel(int id)
+    {
+        busyId.Add(id);
+        StateHasChanged();
+
+        var auth = await Auth.GetAuthenticationStateAsync();
+        var userId = Guid.Parse(auth.User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+        await ReservationService.CancelAsync(id, userId);
+        list = await LoadAsync();
+
+        busyId.Remove(id);
+    }
+}

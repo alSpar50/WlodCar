@@ -1,0 +1,250 @@
+﻿@page "/calculator"
+@attribute [Authorize]
+@rendermode InteractiveServer
+
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.EntityFrameworkCore
+@using WlodCar.Services
+@using WlodCar.Data.Entities
+
+@inject ApplicationDbContext   Db
+@inject IReservationService    ReservationService
+@inject ReservationState       State
+@inject NavigationManager      Nav
+
+<PageTitle>Kalkulator – WlodCar</PageTitle>
+
+<section class="container my-5">
+    <div class="border-bottom mb-4">
+        <h2 class="fw-bold display-6 text-wc-navy mb-2">Oblicz koszt rezerwacji</h2>
+        <p class="text-muted mb-4 col-lg-8">
+            Wybierz kryteria, a my znajdziemy dla Ciebie najlepszy samochód —
+            od razu przejdziesz do potwierdzenia rezerwacji.
+        </p>
+    </div>
+
+    <!-- ► FORMULARZ ------------------------------------------------------- -->
+    <EditForm Model="@form" OnValidSubmit="Calculate" class="row gy-4 gy-lg-0">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+
+        <!-- kolumna 1 -->
+        <div class="col-lg-4">
+            <div class="calc-box p-4">
+                <label class="form-label fw-semibold mb-2">Data odbioru</label>
+                <InputDate class="form-control mb-3" @bind-Value="form.Start" />
+
+                <label class="form-label fw-semibold mb-2">Data zwrotu</label>
+                <InputDate class="form-control mb-4" @bind-Value="form.End" />
+
+                <label class="form-label fw-semibold d-flex justify-content-between">
+                    <span>Liczba miejsc</span>
+                    <span class="badge bg-secondary">@form.Seats</span>
+                </label>
+                <input type="range" class="form-range mb-4"
+                       min="2" max="9" step="1"
+                       @bind="form.Seats" />
+
+                <label class="form-label fw-semibold d-flex justify-content-between">
+                    <span>Maks. cena za dobę (PLN)</span>
+                    <span class="badge bg-secondary">@form.MaxPricePerDay</span>
+                </label>
+                <input type="range" class="form-range"
+                       min="100" max="1000" step="10"
+                       @bind="form.MaxPricePerDay" />
+            </div>
+        </div>
+
+        <!-- kolumna 2 -->
+        <div class="col-lg-8">
+            <div class="row g-3">
+
+                <div class="col-md-6">
+                    <InputSelect class="form-select" @bind-Value="form.Make">
+                        <option hidden value="">Producent</option>
+                        @foreach (var m in makes) { <option>@m</option> }
+                    </InputSelect>
+                </div>
+                <div class="col-md-6">
+                    <InputSelect class="form-select" @bind-Value="form.Model">
+                        <option hidden value="">Model</option>
+                        @foreach (var m in models) { <option>@m</option> }
+                    </InputSelect>
+                </div>
+
+                <div class="col-12 pt-2"><hr /></div>
+
+                <div class="col-md-6">
+                    <label class="form-label">Fotelik dziecięcy (20 zł / doba)</label>
+                    <InputNumber class="form-control text-center"
+                                 min="0" step="1"
+                                 @bind-Value="form.ChildSeats" />
+                </div>
+
+                <div class="col-md-6 d-flex align-items-end">
+                    <div class="form-check">
+                        <InputCheckbox class="form-check-input"
+                                       @bind-Value="form.Gps" />
+                        <label class="form-check-label">
+                            Nawigacja GPS (15 zł / doba)
+                        </label>
+                    </div>
+                </div>
+
+                <div class="col-md-6 d-flex align-items-end">
+                    <div class="form-check">
+                        <InputCheckbox class="form-check-input"
+                                       @bind-Value="form.AfterHoursReturn" />
+                        <label class="form-check-label">
+                            Zwrot poza godzinami (40 zł / doba)
+                        </label>
+                    </div>
+                </div>
+
+                <div class="col-12 text-end pt-3">
+                    <button type="submit"
+                            class="btn btn-wc-orange px-5 py-2 rounded-pill">
+                        Oblicz
+                    </button>
+                </div>
+            </div>
+        </div>
+    </EditForm>
+</section>
+
+<!-- ► WYNIK ------------------------------------------------------------- -->
+@if (proposal is not null)
+{
+    <section class="container mb-5">
+        <h3 class="fw-bold text-wc-navy mb-4">Nasza propozycja</h3>
+
+        <div class="calc-offer d-flex p-3 mb-4 rounded-3 border">
+            <img src="@proposal.Car.Img" class="offer-img me-3" alt="@proposal.Car.Name" />
+
+            <div class="flex-grow-1">
+                <h5 class="fw-bold mb-1 text-uppercase">@proposal.Car.Name</h5>
+
+                <ul class="list-inline small mb-2 text-muted">
+                    <li class="list-inline-item">@proposal.Car.Seats&nbsp;miejsca</li>
+                    <li class="list-inline-item">@proposal.Car.PricePerDay&nbsp;PLN&nbsp;/ doba</li>
+                </ul>
+
+                <div class="d-flex justify-content-between align-items-center mt-3">
+                    <div>
+                        <span class="text-muted small me-2">Łączny koszt:</span>
+                        <span class="fw-bold h5 mb-0">
+                            @proposal.Total.ToString("0.00") PLN
+                        </span>
+                    </div>
+
+                    <button class="btn btn-wc-orange px-4"
+                            @onclick="Accept">Rezerwuj</button>
+                </div>
+            </div>
+        </div>
+    </section>
+}
+else if (calculated)
+{
+    <section class="container mb-5">
+        <div class="alert alert-warning">Brak dostępnych samochodów.</div>
+    </section>
+}
+
+@code {
+    /* --- formularz --- */
+    private readonly CalcForm form = new();
+    private IEnumerable<string> makes  = Enumerable.Empty<string>();
+    private IEnumerable<string> models = Enumerable.Empty<string>();
+
+    /* --- wynik --- */
+    private Proposal? proposal;
+    private bool calculated;               // flaga: kliknięto „Oblicz”
+
+    protected override async Task OnInitializedAsync()
+    {
+        makes  = await Db.Cars.Select(c => c.Brand).Distinct().ToListAsync();
+        models = await Db.Cars.Select(c => c.Model).Distinct().ToListAsync();
+    }
+
+    private async Task Calculate()
+    {
+        calculated = true;
+        proposal   = null;
+
+        var start = form.Start.Date;
+        var end   = form.End.Date;
+        if (end <= start) end = start.AddDays(1);
+
+        var query = Db.Cars.AsQueryable();
+        if (!string.IsNullOrEmpty(form.Make))
+            query = query.Where(c => c.Brand == form.Make);
+        if (!string.IsNullOrEmpty(form.Model))
+            query = query.Where(c => c.Model == form.Model);
+
+        query = query.Where(c => c.Seats >= form.Seats &&
+                                 c.PricePerDay <= form.MaxPricePerDay);
+
+        var candidates = await query.ToListAsync();
+
+        var available = new List<Car>();
+        foreach (var car in candidates)
+            if (await ReservationService.IsCarAvailable(car.Id.ToString(), start, end))
+                available.Add(car);
+
+        if (!available.Any()) return;
+
+        var best = available.OrderBy(c => c.PricePerDay).First();
+        var days = Math.Max(1, (end - start).Days);
+
+        var extrasPerDay = form.ChildSeats * 20 +
+                           (form.Gps              ? 15 : 0) +
+                           (form.AfterHoursReturn ? 40 : 0);
+
+        proposal = new Proposal(best,
+                                (best.PricePerDay + extrasPerDay) * days,
+                                start, end);
+    }
+
+    private void Accept()
+    {
+        if (proposal is null) return;
+
+        State.Reset();
+
+        var c = proposal.Car;
+        State.SelectedCar = new CarVm(c.Id.ToString(), c.Name, c.PricePerDay, c.Img);
+
+        if (form.ChildSeats > 0)
+            State.Extras.Add(new ExtraVm("child", $"Fotelik x{form.ChildSeats}", form.ChildSeats * 20));
+        if (form.Gps)
+            State.Extras.Add(new ExtraVm("gps", "Nawigacja GPS", 15));
+        if (form.AfterHoursReturn)
+            State.Extras.Add(new ExtraVm("after", "Zwrot poza godzinami", 40));
+
+        State.PickupDate = proposal.Start;
+        State.ReturnDate = proposal.End;
+
+        Nav.NavigateTo("/calculator/confirm");
+    }
+
+    /* --- MODELE wewnętrzne --- */
+    private sealed class CalcForm
+    {
+        [Required] public DateTime Start { get; set; } = DateTime.Today;
+        [Required] public DateTime End   { get; set; } = DateTime.Today.AddDays(7);
+
+        public string? Make  { get; set; }
+        public string? Model { get; set; }
+
+        public int Seats          { get; set; } = 5;
+        public int MaxPricePerDay { get; set; } = 600;
+
+        public int  ChildSeats       { get; set; } = 0;
+        public bool Gps             { get; set; }
+        public bool AfterHoursReturn { get; set; }
+    }
+
+    private sealed record Proposal(Car Car, decimal Total,
+                                   DateTime Start, DateTime End);
+}

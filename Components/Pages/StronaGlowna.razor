@@ -1,0 +1,109 @@
+﻿@page "/"
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Components.Routing
+@inject NavigationManager Nav
+
+<!-- ===== META ===== -->
+<PageTitle>WlodCar – wypożycz auto</PageTitle>
+
+<!-- ===== HERO ===== -->
+<section class="wc-hero text-center text-white position-relative">
+    <img src="images/hero.jpg" class="w-100 h-100 object-cover" alt="auto w ruchu">
+
+    <div class="wc-hero-overlay container">
+        <h1 class="display-4 fw-bold">Lorem ipsum dolor sit amet.</h1>
+        <p class="lead mb-4">
+            Lorem ipsum dolor sit amet, consectetur adipiscing elit. Ut et massa mi.
+        </p>
+
+        <EditForm Model="@form" OnValidSubmit="Search" FormName="quick-search">
+            <DataAnnotationsValidator />
+            <div class="wc-search bg-white rounded-pill shadow-lg p-2
+                        d-flex flex-lg-nowrap flex-wrap gap-2 align-items-center">
+
+                <!-- miejsce -->
+                <InputSelect class="form-select flex-grow-1" @bind-Value="form.Location">
+                    <option hidden value="">Miejsce odbioru</option>
+                    <option>Płock</option>
+                    <option>Iława</option>
+                    <option>Wyszków</option>
+                </InputSelect>
+
+                <!-- data od -->
+                <InputDate class="form-control flex-grow-1"
+                           @bind-Value="form.StartDate" />
+
+                <!-- data do -->
+                <InputDate class="form-control flex-grow-1"
+                           @bind-Value="form.EndDate" />
+
+                <button class="btn btn-wc-orange px-4" type="submit">
+                    Szukaj
+                </button>
+            </div>
+        </EditForm>
+    </div>
+</section>
+
+<!-- ===== PROMOCJE / OFERTA (bez zmian) ===== -->
+<section class="container my-5">
+
+    <div class="wc-promo row g-0 overflow-hidden rounded-4 mb-4">
+        <div class="col-md-5 wc-promo-text">
+            <span class="badge bg-info-soft text-uppercase fw-semibold small mb-2">Promocja</span>
+            <h3 class="fw-bold mb-3">Lorem ipsum dolor sit amet, consectetur.</h3>
+            <p class="small mb-4">Lorem ipsum dolor sit amet, consectetur.</p>
+            <a class="btn btn-outline-light rounded-pill px-4" href="/offer">Button</a>
+        </div>
+        <div class="col-md-7">
+            <img src="images/promo1.jpg" class="w-100 h-100 object-cover" />
+        </div>
+    </div>
+
+    <div class="wc-promo row g-0 overflow-hidden rounded-4">
+        <div class="col-md-7">
+            <img src="images/promo2.jpg" class="w-100 h-100 object-cover" />
+        </div>
+        <div class="col-md-5 wc-promo-text">
+            <span class="badge bg-info-soft text-uppercase fw-semibold small mb-2">Oferta</span>
+            <h3 class="fw-bold mb-3">Lorem ipsum dolor sit amet, consectetur.</h3>
+            <p class="small mb-4">Lorem ipsum dolor sit amet, consectetur.</p>
+            <a class="btn btn-outline-light rounded-pill px-4" href="/offer">Button</a>
+        </div>
+    </div>
+
+</section>
+
+@code {
+    /* ---------- model formularza ---------- */
+    private readonly SearchForm form = new();
+
+    /* ---------- akcja Szukaj ---------- */
+    void Search()
+    {
+        var query = new Dictionary<string, object?>
+            {
+                ["loc"] = form.Location,
+                ["sd"] = form.StartDate.ToString("yyyy-MM-dd"),
+                ["ed"] = form.EndDate.ToString("yyyy-MM-dd")
+            };
+
+        var url = Nav.GetUriWithQueryParameters("/samochody", query);
+
+        Nav.NavigateTo(url /*, forceLoad: true */);   // ← absolutny URL
+    }
+
+    /* ---------- klasowy DTO ---------- */
+    private sealed class SearchForm
+    {
+        [Required(ErrorMessage = "Wybierz lokalizację")] public string? Location { get; set; }
+
+        [Required]
+        public DateOnly StartDate { get; set; }
+            = DateOnly.FromDateTime(DateTime.Today.AddDays(1));
+
+        [Required]
+        public DateOnly EndDate { get; set; }
+            = DateOnly.FromDateTime(DateTime.Today.AddDays(3));
+    }
+}

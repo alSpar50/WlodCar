@@ -1,0 +1,116 @@
+﻿@page "/Account/Login"
+
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Authentication
+@using Microsoft.AspNetCore.Identity
+@using WlodCar.Data
+
+@inject SignInManager<ApplicationUser> SignInManager
+@inject ILogger<Login> Logger
+@inject NavigationManager NavigationManager
+@inject IdentityRedirectManager RedirectManager
+
+@layout WlodCar.Components.Account.Shared.AuthLayout
+
+<PageTitle>Logowanie – WlodCar</PageTitle>
+
+<h2 class="auth-title">Zaloguj się</h2>
+
+<StatusMessage Message="@errorMessage" />
+
+<EditForm Model="Input" FormName="login" OnValidSubmit="LoginUser">
+    <DataAnnotationsValidator />
+    <ValidationSummary class="text-danger mb-3" />
+
+    <div class="form-floating mb-3">
+        <InputText id="Input.Email"
+                   class="form-control"
+                   placeholder="name@example.com"
+                   autocomplete="username"
+                   @bind-Value="Input.Email" />
+        <label for="Input.Email">
+            <i class="bi bi-envelope me-2"></i>Adres e-mail
+        </label>
+        <ValidationMessage For="() => Input.Email" class="text-danger" />
+    </div>
+
+    <div class="form-floating mb-3">
+        <InputText id="Input.Password"
+                   type="password"
+                   class="form-control"
+                   placeholder="hasło"
+                   autocomplete="current-password"
+                   @bind-Value="Input.Password" />
+        <label for="Input.Password">
+            <i class="bi bi-lock me-2"></i>Hasło
+        </label>
+        <ValidationMessage For="() => Input.Password" class="text-danger" />
+    </div>
+
+    <div class="form-check mb-4">
+        <InputCheckbox class="form-check-input"
+                       id="remember"
+                       @bind-Value="Input.RememberMe" />
+        <label class="form-check-label" for="remember">Zapamiętaj mnie</label>
+    </div>
+
+    <button class="btn btn-wc-orange w-100 py-2">Zaloguj się</button>
+
+    <div class="text-center small mt-3">
+        <a href="Account/ForgotPassword">Nie pamiętasz hasła?</a><br />
+        Nie masz konta?
+        <a href="@NavigationManager.GetUriWithQueryParameters(
+                    "Account/Register",
+                    new Dictionary<string, object?> { ["ReturnUrl"] = ReturnUrl })">
+            Zarejestruj się
+        </a>
+    </div>
+</EditForm>
+
+@code {
+    private string? errorMessage;
+
+    [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
+    [SupplyParameterFromForm] private InputModel Input { get; set; } = new();
+    [SupplyParameterFromQuery] private string? ReturnUrl { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (HttpMethods.IsGet(HttpContext.Request.Method))
+            await HttpContext.SignOutAsync(IdentityConstants.ExternalScheme);
+    }
+
+    public async Task LoginUser()
+    {
+        var result = await SignInManager.PasswordSignInAsync(
+            Input.Email, Input.Password, Input.RememberMe, lockoutOnFailure: false);
+
+        if (result.Succeeded)
+        {
+            Logger.LogInformation("User logged in.");
+            RedirectManager.RedirectTo(ReturnUrl);
+        }
+        else if (result.RequiresTwoFactor)
+        {
+            RedirectManager.RedirectTo(
+                "Account/LoginWith2fa",
+                new() { ["returnUrl"] = ReturnUrl, ["rememberMe"] = Input.RememberMe });
+        }
+        else if (result.IsLockedOut)
+        {
+            Logger.LogWarning("User account locked out.");
+            RedirectManager.RedirectTo("Account/Lockout");
+        }
+        else
+        {
+            errorMessage = "Błąd: nieprawidłowy e-mail lub hasło.";
+        }
+    }
+
+    private sealed class InputModel
+    {
+        [Required, EmailAddress] public string Email { get; set; } = "";
+        [Required, DataType(DataType.Password)] public string Password { get; set; } = "";
+        public bool RememberMe { get; set; }
+    }
+}

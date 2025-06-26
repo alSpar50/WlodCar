@@ -1,0 +1,173 @@
+﻿@page "/offer"
+@page "/oferta"
+@attribute [AllowAnonymous]
+@rendermode InteractiveServer
+
+@using Microsoft.EntityFrameworkCore
+@using WlodCar.Data.Entities
+@using WlodCar.Components
+@using System.Globalization
+@inject ApplicationDbContext Db
+
+<PageTitle>WlodCar – Oferta</PageTitle>
+
+<!-- ─────────────────────────── HERO / INTRO ─────────────────────────── -->
+<section class="bg-light py-5 mb-5">
+    <div class="container text-center">
+        <h1 class="display-4 fw-bold mb-3">
+            <span class="text-wlodcar">WlodCar</span> – pasja Pawła Włodkowica
+        </h1>
+        <p class="lead mx-auto" style="max-width: 720px;">
+            Od <strong>1313&nbsp;r.</strong>, gdy Paweł Włodkowic wyruszył
+            w pierwszą podróż dyplomatyczną, minęło wiele wieków,
+            ale duch odkrywania pozostał. Dziś jego wizję wolności dróg i
+            otwartości łączymy z nowoczesną flotą samochodów – prosto z
+            <abbr title="Szkoła Wyższa Pawła Włodkowica">SWPW</abbr>
+            do Twoich planów.
+        </p>
+
+        <div class="row g-4 mt-4">
+            <div class="col-6 col-md-3">
+                <i class="bi bi-speedometer2 display-6 text-wlodcar"></i>
+                <h6 class="mt-2">Pełna moc</h6>
+                <small>Nowoczesne silniki i natychmiastowa dostępność.</small>
+            </div>
+            <div class="col-6 col-md-3">
+                <i class="bi bi-shield-check display-6 text-wlodcar"></i>
+                <h6 class="mt-2">Bezpieczeństwo</h6>
+                <small>Regularne przeglądy i ubezpieczenie OC/AC.</small>
+            </div>
+            <div class="col-6 col-md-3">
+                <i class="bi bi-geo-alt display-6 text-wlodcar"></i>
+                <h6 class="mt-2">Wygodny odbiór</h6>
+                <small>Oddziały w Płocku, Iławie i Wyszkowie.</small>
+            </div>
+            <div class="col-6 col-md-3">
+                <i class="bi bi-currency-exchange display-6 text-wlodcar"></i>
+                <h6 class="mt-2">Jasne zasady</h6>
+                <small>Brak ukrytych opłat, rabaty lojalnościowe.</small>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ──────────────────────────  MOZAIKA  ─────────────────────────── -->
+@if (cars is null)
+{
+    <div class="text-center py-5">
+        <span class="spinner-border spinner-border-sm me-2"></span>Ładuję…
+    </div>
+}
+else if (!cars.Any())
+{
+    <div class="alert alert-info text-center">Brak dostępnych samochodów.</div>
+}
+else
+{
+    <div class="container">
+        <div class="card border-0 shadow-lg overflow-hidden position-relative">
+            <div class="car-mosaic">
+                @foreach (var car in cars.Take(3))
+                {
+                    <img src="@car.Img" alt="@car.Name" />
+                }
+            </div>
+
+            <div class="card-img-overlay d-flex flex-column justify-content-end p-0">
+                <div class="info-box m-4 m-md-5">
+                    <h2 class="text-white fw-bold mb-2">
+                        Trzy klasy – jedna decyzja
+                    </h2>
+                    <p class="text-white-50 mb-4" style="max-width:420px;">
+                        Miejskie <em>City</em>, rodzinne <em>Combi</em>,
+                        a może coś z pazurem? Wybierz na kolejnej stronie,
+                        a resztą zajmiemy się my.
+                    </p>
+                    <a href="/rezerwacja" class="btn btn-wlodcar btn-lg px-4">
+                        Przejdź do rezerwacji
+                        <i class="bi bi-arrow-right ms-1"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- ─────────────────────────── CSS ─────────────────────────── -->
+<style>
+    /* ========== kolor firmowy ========== */
+    .text-wlodcar {
+        color: #f36c0d !important;
+    }
+
+    .btn-wlodcar {
+        background: #f36c0d;
+        border-color: #f36c0d;
+        color: #fff;
+    }
+
+        .btn-wlodcar:hover {
+            background: #d95800;
+            border-color: #d95800;
+            color: #fff;
+        }
+
+    /* ========== mozaika ========== */
+    .car-mosaic {
+        display: grid;
+        grid-template-columns: repeat(3,1fr);
+        height: 360px;
+    }
+
+        .car-mosaic img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            filter: brightness(.75);
+            transition: .4s;
+        }
+
+            .car-mosaic img:hover {
+                filter: brightness(1);
+                transform: scale(1.05);
+            }
+
+    /* ========== overlay ========== */
+    .card-img-overlay { /* NIE ma własnego tła! */
+        display: flex;
+        align-items: flex-end; /* ustawiamy wszystko przy dolnej krawędzi */
+        justify-content: flex-start;
+        padding: 0; /* margines nadajemy tylko info-boxowi */
+    }
+
+    /* ========== info-box ========== */
+    .info-box {
+        background: rgba(0,0,0,.65); /* ciemny, pół-transparentny */
+        border-radius: 1rem;
+        padding: 2rem;
+        margin: 2rem;
+        max-width: 460px;
+        backdrop-filter: blur(3px);
+    }
+
+    /* gradient tylko na XS – nakładany TYLKO na info-box */
+    @@media(max-width:575.98px) {
+        .info-box {
+            background: linear-gradient( to top, rgba(0,0,0,.8) 0%, rgba(0,0,0,.6) 30%, rgba(0,0,0,.0) 100%);
+        }
+    }
+</style>
+
+@code {
+    private List<Car>? cars;
+
+    protected override async Task OnInitializedAsync()
+    {
+        cars = await Db.Cars
+                       .Where(c => c.IsAvailable)
+                       .OrderBy(c => c.Brand)
+                       .ThenBy(c => c.Model)
+                       .AsNoTracking()
+                       .ToListAsync();
+    }
+}

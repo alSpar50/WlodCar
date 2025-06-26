@@ -1,0 +1,12 @@
+﻿@namespace WlodCar.Components.Pages.Reservations
+
+var res = new Reservation {
+    CarId = SelectedCar.Id,
+    ApplicationUserId = userId,
+    StartDate = start,
+    EndDate = end,
+    TotalPrice = price
+};
+Db.Reservations.Add(res);
+await Db.SaveChangesAsync();
+await emailSender.SendAsync(user.Email,"Potwierdzenie rezerwacji",$"<p>Id: {res.Id}</p>");

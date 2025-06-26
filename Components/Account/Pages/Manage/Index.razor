@@ -1,0 +1,183 @@
+﻿@page "/Account/Manage"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.AspNetCore.Components.Forms
+@inject UserManager<ApplicationUser> UserManager
+@inject NavigationManager Nav
+@inject IWebHostEnvironment Env
+@inject AuthenticationStateProvider AuthStateProvider
+
+<PageTitle>Moje konto</PageTitle>
+
+<div class="row g-4">
+    <!-- ╔══ lewy panel ══════════════════════════════════════ -->
+    <div class="col-lg-3">
+        <div class="card p-3 mb-3 text-center">
+            <img class="avatar-lg rounded-circle mb-3"
+                 src="@AvatarUrl" alt="avatar">
+
+            <div class="d-flex justify-content-center gap-3">
+                <label class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-image"></i> Wybierz plik
+                    <InputFile OnChange="UploadAvatar"
+                               accept="image/*"
+                               style="display:none" />
+                </label>
+
+                @if (!string.IsNullOrEmpty(_user?.AvatarFileName))
+                {
+                    <a href="#" class="small" @onclick="RemoveAvatar">Usuń</a>
+                }
+            </div>
+
+            @if (avatarError is not null)
+            {
+                <div class="text-danger small mt-1">@avatarError</div>
+            }
+        </div>
+
+        <div class="card p-3 mb-3 small">
+            Posiadasz <span class="text-wc-orange fw-bold">@(_user?.LoyaltyPoints ?? 0)</span>
+            punktów lojalnościowych
+            (<span class="fw-bold">@((_user?.LoyaltyPoints ?? 0) / 10)</span>% rabatu).
+            <br />
+            <a href="#">Zarządzaj moimi punktami &gt;&gt;</a>
+        </div>
+
+        <EditForm OnValidSubmit="SaveNote" Model="@this" FormName="note">
+            <div class="card p-3 d-flex flex-column">
+                <label class="form-label small">Moje notatki</label>
+                <InputTextArea class="form-control flex-grow-1" rows="6"
+                               @bind-Value="Note" />
+                <button class="btn btn-sm btn-primary mt-3 align-self-end">
+                    Zapisz zmiany
+                </button>
+            </div>
+        </EditForm>
+
+        @if (NoteSaved)
+        {
+            <div class="alert alert-success mt-2 p-1 text-center small">
+                Zapisano.
+            </div>
+        }
+    </div>
+
+    <!-- ╔══ prawa kolumna ════════════════════════════════════ -->
+    <div class="col-lg-9">
+        <h5 class="fw-semibold mb-4">Ustawienia podstawowe</h5>
+
+        <div class="row mb-4">
+            <!-- E-mail ------------------------------------------------------>
+            <div class="col-md-6 mb-3">
+                <label class="form-label">E-mail</label>
+                <input class="form-control" value="@_user?.Email" disabled />
+                <NavLink class="small d-block mt-1"
+                         href="/Account/Manage/Email">Zmień</NavLink>
+            </div>
+
+            <!-- Hasło ------------------------------------------------------>
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Hasło</label>
+                <input class="form-control" value="********" type="password" disabled />
+                <NavLink class="small d-block mt-1"
+                         href="/Account/Manage/ChangePassword">Zmień</NavLink>
+            </div>
+
+            <!-- Telefon ---------------------------------------------------->
+            <div class="col-md-6">
+                <label class="form-label">Telefon</label>
+                <input class="form-control"
+                       value="@(_user?.PhoneNumber ?? string.Empty)" disabled />
+                <NavLink class="small d-block mt-1"
+                         href="/Account/Manage/Phone">Zmień</NavLink>
+            </div>
+        </div>
+
+        <hr />
+        <h6 class="fw-semibold">Ustawienia zaawansowane <i class="bi bi-chevron-right"></i></h6>
+    </div>
+</div>
+
+@code {
+    private ApplicationUser? _user;
+    public  string? Note { get; set; }
+    private bool   NoteSaved;
+    private string AvatarUrl =>
+    string.IsNullOrEmpty(_user?.AvatarFileName)
+        ? "images/avatar-placeholder.jpg"
+        : $"/uploads/avatars/{_user!.AvatarFileName}?v={_avatarVersion}";
+
+    /* ---------- life-cycle ------------------------------------------ */
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        _user = await UserManager.GetUserAsync(authState.User);
+        Note  = _user?.Note;
+    }
+
+    /* ---------- notatki --------------------------------------------- */
+    private async Task SaveNote()
+    {
+        if (_user is null) return;
+        _user.Note = Note;
+        await UserManager.UpdateAsync(_user);
+        NoteSaved = true;
+    }
+
+    /* ---------- avatar ---------------------------------------------- */
+    private const long AvatarSizeLimit = 5 * 1024 * 1024; // 5 MB
+
+    private async Task UploadAvatar(InputFileChangeEventArgs e)
+    {
+        if (_user is null) return;
+
+        var file = e.File;
+        if (file is null) return;
+
+        if (file.Size > AvatarSizeLimit)
+        {
+            avatarError = "Plik jest większy niż 5 MB.";
+            return;
+        }
+
+        var ext = Path.GetExtension(file.Name).ToLowerInvariant();
+        if (!new[] { ".jpg", ".jpeg", ".png", ".gif" }.Contains(ext))
+        {
+            avatarError = "Dozwolone formaty: jpg, png, gif.";
+            return;
+        }
+
+        var fileName = $"{_user.Id}{ext}";
+        var path = Path.Combine(Env.WebRootPath, "uploads", "avatars", fileName);
+
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        await using var fs = File.Create(path);
+        await file.OpenReadStream(AvatarSizeLimit).CopyToAsync(fs);
+
+        _user.AvatarFileName = fileName;
+        await UserManager.UpdateAsync(_user);
+
+        // ► cache-busting – dodajemy znacznik czasu
+        _avatarVersion = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        StateHasChanged();
+    }
+
+    private string? avatarError;
+    private long _avatarVersion;   // do odświeżania obrazka
+
+    private async Task RemoveAvatar()
+    {
+        if (_user is null || string.IsNullOrEmpty(_user.AvatarFileName))
+            return;
+
+        var path = Path.Combine(Env.WebRootPath, "uploads", "avatars", _user.AvatarFileName);
+        if (System.IO.File.Exists(path)) System.IO.File.Delete(path);
+
+        _user.AvatarFileName = null;
+        await UserManager.UpdateAsync(_user);
+        StateHasChanged();
+    }
+}

@@ -1,0 +1,20 @@
+﻿
+@namespace WlodCar.Components.Pages.Reservations
+@attribute [Authorize]
+@page "/reservation/step1/{CarId:int}"
+@inject NavigationManager Nav
+@inject ApplicationDbContext Db
+<h3>Krok 1 – wybierz daty</h3>
+
+<InputDate @bind-Value="start" />
+<InputDate @bind-Value="end" />
+
+<button class="btn btn-primary" @onclick="Next" disabled="@(!IsValid)">Dalej</button>
+
+@code{
+ [Parameter] public int CarId {get;set;}
+ DateOnly start=DateOnly.FromDateTime(DateTime.Today.AddDays(1));
+ DateOnly end  =DateOnly.FromDateTime(DateTime.Today.AddDays(3));
+ bool IsValid => end>start;
+ void Next() => Nav.NavigateTo($"/reservation/step2/{CarId}/{start}/{end}");
+}

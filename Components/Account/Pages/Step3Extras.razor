@@ -1,0 +1,46 @@
+﻿@using WlodCar.Services
+@inject ReservationState State
+
+<h5 class="mb-3">Krok 3 – wybierz dodatki</h5>
+
+@foreach (var ex in Extras)
+{
+    <div class="form-check mb-2">
+        <input type="checkbox" class="form-check-input"
+               @bind="@ex.Selected" />
+        <label class="form-check-label">
+            @ex.Name (<b>@ex.Price PLN</b>)
+        </label>
+    </div>
+}
+
+<div class="d-flex justify-content-between mt-4">
+    <button class="btn btn-outline-secondary" @onclick="OnPrev">Wstecz</button>
+    <button class="btn btn-primary" @onclick="Next">Dalej</button>
+</div>
+
+@code {
+    [Parameter] public EventCallback OnNext { get; set; }
+    [Parameter] public EventCallback OnPrev { get; set; }
+
+    private List<ExtraVmEx> Extras = new()
+    {
+        new("gps","Nawigacja GPS", 20),
+        new("seat","Fotelik dziecięcy",15),
+        new("after","Zwrot poza godzinami",40)
+    };
+
+    private async Task Next()
+    {
+        State.Extras.Clear();
+        State.Extras.AddRange(
+            Extras.Where(e => e.Selected).Select(e => new ExtraVm(e.Id, e.Name, e.Price)));
+
+        await OnNext.InvokeAsync();
+    }
+
+    record ExtraVmEx(string Id, string Name, decimal Price)
+    {
+        public bool Selected { get; set; }
+    }
+}

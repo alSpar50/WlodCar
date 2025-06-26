@@ -1,0 +1,92 @@
+﻿@using WlodCar.Services
+@using System.Security.Claims
+@inject ReservationState State
+@inject IReservationService ReservationService
+@inject AuthenticationStateProvider Auth
+
+<h5 class="mb-3">Krok 2 – wybierz samochód</h5>
+
+@if (error is not null)
+{
+    <div class="alert alert-danger">@error</div>
+}
+
+<div class="row row-cols-1 row-cols-md-3 g-3">
+    @foreach (var c in Cars)
+    {
+        <div class="col">
+            <div class="card h-100 text-center">
+                <img src="@c.Img" class="card-img-top" />
+                <div class="card-body">
+                    <h6>@c.Name</h6>
+                    <p class="fw-bold">@c.PricePerDay:0.00 PLN / dzień</p>
+
+                    <button class="btn btn-primary"
+                            disabled="@busy"
+                            @onclick="() => Select(c)">
+                        Wybierz
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<div class="d-flex justify-content-between mt-4">
+    <button class="btn btn-outline-secondary" @onclick="OnPrev">Wstecz</button>
+</div>
+
+@code {
+    [Parameter] public EventCallback OnNext { get; set; }
+    [Parameter] public EventCallback OnPrev { get; set; }
+
+    private readonly List<CarVm> Cars =
+        [
+        new("1","Skoda Fabia",110,"images/cars/fabia.png"),
+        new("2","Audi A3",     145,"images/cars/a3.png"),
+        new("3","Mercedes GLA",180,"images/cars/gla.png")
+    ];
+
+    private bool busy = false;
+    private string? error;
+
+    private async Task Select(CarVm car)
+    {
+        error = null;
+
+        // podstawowa walidacja stanu – jeśli coś jest puste, nie idź dalej
+        if (State.PickupDate is null || State.ReturnDate is null)
+        {
+            error = "Najpierw uzupełnij daty w kroku 1.";
+            return;
+        }
+
+        busy = true;
+
+        try
+        {
+            var available = await ReservationService.IsCarAvailable(
+                               car.Id,
+                               State.PickupDate.Value,
+                               State.ReturnDate.Value);
+
+            if (!available)
+            {
+                error = "Przepraszamy, ten samochód jest już zajęty " +
+                        "w wybranym terminie.";
+                return;
+            }
+
+            State.SelectedCar = car;
+            await OnNext.InvokeAsync();
+        }
+        catch (Exception ex)
+        {
+            error = "Błąd serwera: " + ex.Message;
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+}

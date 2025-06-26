@@ -1,0 +1,88 @@
+﻿@page "/samochody"
+@using Microsoft.EntityFrameworkCore
+@using System.Diagnostics
+@using WlodCar.Data
+@using WlodCar.Data.Entities
+@using WlodCar.Components
+@using System.Globalization
+@inject NavigationManager Nav
+@inject ApplicationDbContext Db
+
+<PageTitle>Dostępne samochody</PageTitle>
+
+<h3 class="mb-4">
+    Dostępne auta: @loc,
+    @from:dd.MM.yyyy – @to:dd.MM.yyyy
+</h3>
+
+@if (!cars.Any())
+{
+    <div class="alert alert-warning">
+        Brak wolnych pojazdów w wybranym terminie.
+    </div>
+}
+else
+{
+    <div class="row row-cols-1 row-cols-md-3 g-4">
+        @foreach (var c in cars)
+        {
+            <div class="col">
+                <div class="card h-100 text-center">
+                    <img src="@c.Img" class="card-img-top" />
+                    <div class="card-body">
+                        <h6>@c.Name</h6>
+                        <p class="fw-bold mb-2">@c.PricePerDay:0.00 PLN / dzień</p>
+                        <a class="btn btn-primary" href="#">
+                            Rezerwuj
+                        </a>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@* -------- odczyt parametrów z query-string -------- *@
+@code {
+    [SupplyParameterFromQuery] public string? loc { get; set; }
+    [SupplyParameterFromQuery] public string? sd { get; set; }   // yyyy-MM-dd
+    [SupplyParameterFromQuery] public string? ed { get; set; }
+
+    private DateTime from, to;
+    private List<Car> cars = [];
+
+    protected override async Task OnParametersSetAsync()
+    {
+
+
+        var iso = CultureInfo.InvariantCulture;
+
+        // ---- WALIDACJA + LOGI ---------------------------------
+        var parseSd = DateTime.TryParseExact(sd, "yyyy-MM-dd", iso,
+                                             DateTimeStyles.None, out from);
+        var parseEd = DateTime.TryParseExact(ed, "yyyy-MM-dd", iso,
+                                             DateTimeStyles.None, out to);
+        var locOk = !string.IsNullOrWhiteSpace(loc);
+
+        Debug.WriteLine($"sd OK={parseSd}, ed OK={parseEd}, loc OK={locOk}");
+
+        if (!parseSd || !parseEd || !locOk)
+        {
+            Nav.NavigateTo("/");
+            return;
+        }
+        // --------------------------------------------------------
+
+        
+
+        // auta dostępne w danym terminie (brak rezerwacji Active kolidujących)
+        cars = await Db.Cars
+            .Where(c => c.IsAvailable)
+            .Where(c => !Db.Reservations
+               .Any(r => r.CarId == c.Id.ToString() &&   // ← .ToString()
+                         r.Status == ReservationStatus.Active &&
+                        !(r.DateTo <= from || r.DateFrom >= to)))
+            .AsNoTracking()
+            .ToListAsync();
+    }
+}

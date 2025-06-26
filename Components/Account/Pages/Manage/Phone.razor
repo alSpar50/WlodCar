@@ -1,0 +1,62 @@
+﻿@page "/Account/Manage/Phone"
+@attribute [Authorize]
+@rendermode InteractiveServer
+
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.AspNetCore.Components.Authorization
+@inject UserManager<ApplicationUser> UserManager
+@inject AuthenticationStateProvider AuthState
+
+<PageTitle>Numer telefonu</PageTitle>
+
+<h4 class="mb-4">Dodaj / zmień numer telefonu</h4>
+
+@if (info is not null)
+{
+    <div class="alert alert-@css">@info</div>
+}
+
+<EditForm Model="model"
+          OnValidSubmit="ChangePhone"
+          FormName="phone">
+    <DataAnnotationsValidator />
+    <div class="mb-3">
+        <label class="form-label">Nowy numer</label>
+        <InputText class="form-control" @bind-Value="model.Phone" />
+        <ValidationMessage For="@(() => model.Phone)" class="text-danger" />
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Hasło</label>
+        <InputText type="password" class="form-control" @bind-Value="model.Password" />
+        <ValidationMessage For="@(() => model.Password)" class="text-danger" />
+    </div>
+    <button class="btn btn-primary">Zapisz</button>
+</EditForm>
+
+@code {
+    private FormModel model = new();
+    private string? info; string css = "info";
+
+    private async Task ChangePhone()
+    {
+        var user = await UserManager.GetUserAsync((await AuthState.GetAuthenticationStateAsync()).User);
+        if (user is null) return;
+
+        if (!await UserManager.CheckPasswordAsync(user, model.Password!))
+        { info = "Błędne hasło."; css = "danger"; return; }
+
+        var res = await UserManager.SetPhoneNumberAsync(user, model.Phone!);
+        if (res.Succeeded) { info = "Zapisano."; css = "success"; }
+        else { info = "Błąd zapisu."; css = "danger"; }
+    }
+
+    private class FormModel
+    {
+        [Required, Phone(ErrorMessage = "Niepoprawny numer.")]
+        public string? Phone { get; set; }
+
+        [Required, DataType(DataType.Password)]
+        public string? Password { get; set; }
+    }
+}
