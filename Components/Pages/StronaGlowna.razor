@@ -1,39 +1,37 @@
 ﻿@page "/"
 @using System.ComponentModel.DataAnnotations
-@using Microsoft.AspNetCore.Components.Routing
 @inject NavigationManager Nav
 
-<!-- ===== META ===== -->
 <PageTitle>WlodCar – wypożycz auto</PageTitle>
 
-<!-- ===== HERO ===== -->
 <section class="wc-hero text-center text-white position-relative">
     <img src="images/hero.jpg" class="w-100 h-100 object-cover" alt="auto w ruchu">
 
     <div class="wc-hero-overlay container">
         <h1 class="display-4 fw-bold">Lorem ipsum dolor sit amet.</h1>
-        <p class="lead mb-4">
-            Lorem ipsum dolor sit amet, consectetur adipiscing elit. Ut et massa mi.
-        </p>
+        <p class="lead mb-4">Lorem ipsum dolor sit amet, consectetur.</p>
 
-        <EditForm Model="@form" OnValidSubmit="Search" FormName="quick-search">
+        <EditForm Model="@form"
+                  OnValidSubmit="Search"
+                  FormName="quick-search">
             <DataAnnotationsValidator />
+            <ValidationSummary class="text-danger mb-2" />
+
             <div class="wc-search bg-white rounded-pill shadow-lg p-2
                         d-flex flex-lg-nowrap flex-wrap gap-2 align-items-center">
 
-                <!-- miejsce -->
-                <InputSelect class="form-select flex-grow-1" @bind-Value="form.Location">
-                    <option hidden value="">Miejsce odbioru</option>
+                <!-- ↓↓↓ lokalizacja już NIE jest wymagana -->
+                <InputSelect class="form-select flex-grow-1"
+                             @bind-Value="form.Location">
+                    <option value="">Wszystkie lokalizacje</option>
                     <option>Płock</option>
                     <option>Iława</option>
                     <option>Wyszków</option>
                 </InputSelect>
 
-                <!-- data od -->
                 <InputDate class="form-control flex-grow-1"
                            @bind-Value="form.StartDate" />
 
-                <!-- data do -->
                 <InputDate class="form-control flex-grow-1"
                            @bind-Value="form.EndDate" />
 
@@ -75,28 +73,27 @@
 </section>
 
 @code {
-    /* ---------- model formularza ---------- */
     private readonly SearchForm form = new();
 
-    /* ---------- akcja Szukaj ---------- */
     void Search()
     {
         var query = new Dictionary<string, object?>
             {
-                ["loc"] = form.Location,
                 ["sd"] = form.StartDate.ToString("yyyy-MM-dd"),
                 ["ed"] = form.EndDate.ToString("yyyy-MM-dd")
             };
 
-        var url = Nav.GetUriWithQueryParameters("/samochody", query);
+        if (!string.IsNullOrWhiteSpace(form.Location))
+            query["loc"] = form.Location;          // dodaj tylko, gdy wybrano
 
-        Nav.NavigateTo(url /*, forceLoad: true */);   // ← absolutny URL
+        var url = Nav.GetUriWithQueryParameters("/samochody", query);
+        Nav.NavigateTo(url, forceLoad: true);
     }
 
-    /* ---------- klasowy DTO ---------- */
     private sealed class SearchForm
     {
-        [Required(ErrorMessage = "Wybierz lokalizację")] public string? Location { get; set; }
+        /* ← brak atrybutu [Required] */
+        public string? Location { get; set; }
 
         [Required]
         public DateOnly StartDate { get; set; }
