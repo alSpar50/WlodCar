@@ -61,8 +61,8 @@ builder.Services.AddSingleton<IEmailSender<ApplicationUser>, ConsoleEmailSender>
 /* ----------- 5.  Budujemy aplikacjê ------------------------------ */
 var app = builder.Build();
 
-/* Inicjalizacja danych/ ról / admina */
-await DbInitializer.SeedAsync(app.Services);
+
+
 
 /* ----------- 6.  Middleware -------------------------------------- */
 if (app.Environment.IsDevelopment())
@@ -106,3 +106,6 @@ using (var scope = app.Services.CreateScope())
 }
 
 app.Run();
+
+/* Inicjalizacja danych/ ról / admina */
+await DbInitializer.SeedAsync(app.Services);

@@ -12,7 +12,7 @@ using WlodCar.Data;
 namespace WlodCar.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20250621171654_InitialCreate")]
+    [Migration("20250810184636_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
