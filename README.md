@@ -1,3 +1,12 @@
+Opis
+
+Aplikacja webowa WlodCar to witryna zbudowana w ramach projektu studenckiego dla SWPW w Płocku. Aplikacja pozwala zarejestrować użytkowników, a także administrację. Administracja rejestruje się po podaniu maila @wlodcar.pl, np.: admin@wlodcar.pl.
+
+Aplikacja pozwala (użytkownikom) m.in. rezerwować samochody, sprawdzać historię rezerwacji, korzystać z punktów lojalnościowych (dla zniżek), edytować swój profil, dodać zdjęcie profilowe, dodać numer telefonu, edytować dane, wprowadzać notatki w panelu "moje konto", dobierać dodatki do rezerwowanego samochodu, wyszukiwać dostępne auta (niedostępne są odfiltrowywane) itd.
+
+Administrator może dodawać auta, zmieniać ich status, zarządzać nimi, wysyłać maile do klientów bezpośrednio z poziomu aplikacji webowej, może też zarządzać użytkownikami itd.
+
+
 Aby uruchomić aplikację webową WlodCar należy:
 
 W Visual Studio 2022 wybrać pierwszą opcję Clone Repository i wkleić link: https://github.com/alSpar50/WlodCar (opcjonalnie zmodyfikować ścieżkę, gdzie repo ma być umieszczone lokalnie),
