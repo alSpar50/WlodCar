@@ -1,22 +1,44 @@
-Opis
+# WlodCar — aplikacja webowa
 
-Aplikacja webowa WlodCar to witryna zbudowana w ramach projektu studenckiego dla SWPW w Płocku. Aplikacja pozwala zarejestrować użytkowników, a także administrację. Administracja rejestruje się po podaniu maila @wlodcar.pl, np.: admin@wlodcar.pl.
+## Opis
 
-Aplikacja pozwala (użytkownikom) m.in. rezerwować samochody, sprawdzać historię rezerwacji, korzystać z punktów lojalnościowych (dla zniżek), edytować swój profil, dodać zdjęcie profilowe, dodać numer telefonu, edytować dane, wprowadzać notatki w panelu "moje konto", dobierać dodatki do rezerwowanego samochodu, wyszukiwać dostępne auta (niedostępne są odfiltrowywane) itd.
+WlodCar to aplikacja webowa zbudowana w ramach projektu studenckiego dla **SWPW w Płocku**.  
+Umożliwia rejestrację **użytkowników** oraz **administracji**.
 
-Administrator może dodawać auta, zmieniać ich status, zarządzać nimi, wysyłać maile do klientów bezpośrednio z poziomu aplikacji webowej, może też zarządzać użytkownikami itd.
+> **Uwaga dla administracji:** rejestracja konta administracyjnego wymaga adresu e-mail w domenie `@wlodcar.pl`, np. `admin@wlodcar.pl`.
 
+## Funkcje
 
-Aby uruchomić aplikację webową WlodCar należy:
+### Dla użytkownika
+- rezerwacja samochodów,
+- podgląd historii rezerwacji,
+- korzystanie z **punktów lojalnościowych** (zniżki),
+- edycja profilu (zdjęcie profilowe, numer telefonu, dane osobowe),
+- notatki w panelu **„Moje konto”**,
+- dobieranie dodatków do rezerwacji,
+- wyszukiwanie **dostępnych** aut (niedostępne są odfiltrowywane).
 
-W Visual Studio 2022 wybrać pierwszą opcję Clone Repository i wkleić link: https://github.com/alSpar50/WlodCar (opcjonalnie zmodyfikować ścieżkę, gdzie repo ma być umieszczone lokalnie),
-po załadowaniu, na górnym pasku VS2022 wejść w Narzędznia -> Menedżer Pakietów NuGet -> Konsola Menadżera Pakietów.
-W dolnej sekcji VS2022 odpali się konsola, gdzie należy wpisać kolejno, jedna po drugiej, następujące komendy:
-a) Drop-Database
-b) Remove-Migration
-c) Add-Migration InitialCreate
-d) Update-Database
+### Dla administratora
+- dodawanie aut i zmiana ich statusów,
+- zarządzanie flotą,
+- wysyłanie e-maili do klientów bezpośrednio z poziomu aplikacji,
+- zarządzanie użytkownikami.
 
-Przy opcji Drop-Database wybrać opcję All (litera A), przy zapytaniu
+---
 
-Po tych krokach u każdego z Was stworzy się lokalnie baza danych, która będzie już bez problemu działać z obecnym kodem.
+## Uruchomienie (Visual Studio 2022)
+
+1. W Visual Studio wybierz **Clone Repository** i wklej adres repozytorium:  
+   `https://github.com/alSpar50/WlodCar`  
+   *(opcjonalnie zmień lokalną ścieżkę docelową).*
+
+2. Otwórz konsolę NuGet:  
+   **Narzędzia → Menedżer pakietów NuGet → Konsola Menedżera pakietów**.
+
+3. W konsoli wpisz kolejno (każde polecenie osobno):
+
+   ```powershell
+   Drop-Database
+   Remove-Migration
+   Add-Migration InitialCreate
+   Update-Database
