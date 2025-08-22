@@ -37,8 +37,13 @@ Umożliwia rejestrację **użytkowników** oraz **administracji**.
 
 3. W konsoli wpisz kolejno (każde polecenie osobno):
 
-   ```powershell
-   Drop-Database
-   Remove-Migration
-   Add-Migration InitialCreate
-   Update-Database
+```powershell
+Drop-Database
+Remove-Migration
+Add-Migration InitialCreate
+Update-Database
+```
+
+> Przy poleceniu `Drop-Database` wybierz opcję **All** (litera **A**), gdy pojawi się pytanie.
+
+4. Po wykonaniu powyższych kroków lokalna baza danych zostanie utworzona i będzie gotowa do pracy z bieżącym kodem.
