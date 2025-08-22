@@ -1,0 +1,269 @@
+﻿@page "/admin/users"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Identity
+@inject ApplicationDbContext Db
+@inject UserManager<ApplicationUser> UserManager
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Nav
+
+<PageTitle>Zarządzanie użytkownikami - WlodCar</PageTitle>
+
+@if (!isAdmin)
+{
+    <div class="alert alert-danger">
+        <i class="bi bi-exclamation-triangle"></i> Brak uprawnień do tej strony.
+    </div>
+}
+else
+{
+    <div class="container my-4">
+        <h2 class="mb-4">
+            <i class="bi bi-people"></i> Zarządzanie użytkownikami
+        </h2>
+
+        <!-- Filtry -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <input type="text" class="form-control" placeholder="Szukaj po emailu..."
+                               @bind="searchTerm" @bind:event="oninput" />
+                    </div>
+                    <div class="col-md-3">
+                        <select class="form-select" @bind="filterType">
+                            <option value="">Wszyscy</option>
+                            <option value="admin">Administratorzy</option>
+                            <option value="user">Użytkownicy</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <button class="btn btn-primary" @onclick="ApplyFilter">
+                            <i class="bi bi-search"></i> Szukaj
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Lista użytkowników -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Lista użytkowników</h5>
+            </div>
+            <div class="card-body">
+                @if (users == null)
+                {
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Ładowanie...</span>
+                    </div>
+                }
+                else if (!users.Any())
+                {
+                    <p>Brak użytkowników spełniających kryteria.</p>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Email</th>
+                                    <th>Imię i nazwisko</th>
+                                    <th>Telefon</th>
+                                    <th>Punkty lojalnościowe</th>
+                                    <th>Typ konta</th>
+                                    <th>Data rejestracji</th>
+                                    <th>Akcje</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var user in filteredUsers)
+                                {
+                                    <tr>
+                                        <td>@user.Email</td>
+                                        <td>@user.FirstName @user.LastName</td>
+                                        <td>@(user.PhoneNumber ?? "-")</td>
+                                        <td>
+                                            @if (!user.Email.Contains("@wlodcar"))
+                                            {
+                                                <span class="badge bg-info">@user.LoyaltyPoints pkt</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted">-</span>
+                                            }
+                                        </td>
+                                        <td>
+                                            @if (user.Email.Contains("@wlodcar"))
+                                            {
+                                                <span class="badge bg-danger">Admin</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-secondary">Użytkownik</span>
+                                            }
+                                        </td>
+                                        <td>
+                                            <small>@GetRegistrationDate(user.Id)</small>
+                                        </td>
+                                        <td>
+                                            <button class="btn btn-sm btn-outline-info" @onclick="() => ViewUserDetails(user)">
+                                                <i class="bi bi-eye"></i> Szczegóły
+                                            </button>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Statystyki -->
+                    <div class="mt-3 p-3 bg-light rounded">
+                        <strong>Statystyki:</strong>
+                        Łącznie użytkowników: @users.Count |
+                        Administratorzy: @users.Count(u => u.Email.Contains("@wlodcar")) |
+                        Zwykli użytkownicy: @users.Count(u => !u.Email.Contains("@wlodcar"))
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- Modal ze szczegółami użytkownika -->
+        @if (selectedUser != null)
+        {
+            <div class="modal show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Szczegóły użytkownika</h5>
+                            <button type="button" class="btn-close" @onclick="CloseDetails"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <p><strong>Email:</strong> @selectedUser.Email</p>
+                                    <p><strong>Imię:</strong> @(selectedUser.FirstName ?? "-")</p>
+                                    <p><strong>Nazwisko:</strong> @(selectedUser.LastName ?? "-")</p>
+                                    <p><strong>Telefon:</strong> @(selectedUser.PhoneNumber ?? "-")</p>
+                                </div>
+                                <div class="col-md-6">
+                                    <p><strong>Email potwierdzony:</strong> 
+                                        @if (selectedUser.EmailConfirmed)
+                                        {
+                                            <span class="text-success">Tak</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-danger">Nie</span>
+                                        }
+                                    </p>
+                                    <p><strong>Punkty lojalnościowe:</strong> @selectedUser.LoyaltyPoints</p>
+                                    <p><strong>Notatka:</strong> @(selectedUser.Note ?? "Brak")</p>
+                                </div>
+                            </div>
+
+                            @if (userReservations != null)
+                            {
+                                <hr />
+                                <h6>Historia rezerwacji:</h6>
+                                @if (userReservations.Any())
+                                {
+                                    <ul class="list-group">
+                                        @foreach (var res in userReservations.Take(5))
+                                        {
+                                            <li class="list-group-item">
+                                                <small>
+                                                    @res.DateFrom.ToString("dd.MM.yyyy") - @res.DateTo.ToString("dd.MM.yyyy") |
+                                                    Status: @res.Status |
+                                                    Kwota: @res.TotalPrice PLN
+                                                </small>
+                                            </li>
+                                        }
+                                    </ul>
+                                    @if (userReservations.Count > 5)
+                                    {
+                                        <small class="text-muted">...i @(userReservations.Count - 5) więcej</small>
+                                    }
+                                }
+                                else
+                                {
+                                    <p class="text-muted">Brak rezerwacji</p>
+                                }
+                            }
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" @onclick="CloseDetails">Zamknij</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private bool isAdmin = false;
+    private List<ApplicationUser>? users;
+    private List<ApplicationUser> filteredUsers = new();
+    private string searchTerm = "";
+    private string filterType = "";
+    private ApplicationUser? selectedUser;
+    private List<Reservation>? userReservations;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var userEmail = authState.User?.Identity?.Name;
+        isAdmin = userEmail?.Contains("@wlodcar", StringComparison.OrdinalIgnoreCase) ?? false;
+
+        if (!isAdmin)
+        {
+            Nav.NavigateTo("/");
+            return;
+        }
+
+        await LoadUsers();
+    }
+
+    private async Task LoadUsers()
+    {
+        users = await UserManager.Users.ToListAsync();
+        ApplyFilter();
+    }
+
+    private void ApplyFilter()
+    {
+        if (users == null) return;
+
+        filteredUsers = users.Where(u =>
+            (string.IsNullOrEmpty(searchTerm) || u.Email.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)) &&
+            (string.IsNullOrEmpty(filterType) ||
+             (filterType == "admin" && u.Email.Contains("@wlodcar")) ||
+             (filterType == "user" && !u.Email.Contains("@wlodcar")))
+        ).ToList();
+    }
+
+    private async Task ViewUserDetails(ApplicationUser user)
+    {
+        selectedUser = user;
+        userReservations = await Db.Reservations
+            .Where(r => r.UserId == Guid.Parse(user.Id))
+            .OrderByDescending(r => r.DateFrom)
+            .ToListAsync();
+    }
+
+    private void CloseDetails()
+    {
+        selectedUser = null;
+        userReservations = null;
+    }
+
+    private string GetRegistrationDate(string userId)
+    {
+        // W prawdziwej aplikacji można by przechowywać datę rejestracji
+        return "N/A";
+    }
+}

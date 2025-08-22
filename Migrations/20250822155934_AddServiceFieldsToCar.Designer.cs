@@ -12,8 +12,8 @@ using WlodCar.Data;
 namespace WlodCar.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20250810184636_InitialCreate")]
-    partial class InitialCreate
+    [Migration("20250822155934_AddServiceFieldsToCar")]
+    partial class AddServiceFieldsToCar
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -278,12 +278,21 @@ namespace WlodCar.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<bool>("InService")
+                        .HasColumnType("bit");
+
                     b.Property<bool>("IsAvailable")
                         .HasColumnType("bit");
+
+                    b.Property<DateTime?>("LastServiceDate")
+                        .HasColumnType("datetime2");
 
                     b.Property<string>("Model")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("NextServiceDate")
+                        .HasColumnType("datetime2");
 
                     b.Property<decimal>("PricePerDay")
                         .HasColumnType("decimal(18,2)");
@@ -295,6 +304,9 @@ namespace WlodCar.Migrations
 
                     b.Property<int>("Seats")
                         .HasColumnType("int");
+
+                    b.Property<string>("ServiceNotes")
+                        .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");
 

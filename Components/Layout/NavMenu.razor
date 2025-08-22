@@ -1,23 +1,33 @@
 ﻿@implements IDisposable
+@using Microsoft.AspNetCore.Components.Authorization
 @inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthStateProvider
 
 <!-- ░░░ GÓRNY PASEK: logo + Logowanie/Rejestracja ░░░ -->
 <header class="border-bottom">
     <div class="container d-flex justify-content-between align-items-center py-1">
-        <!-- logo → kliknięcie wraca na “/” -->
+        <!-- logo → kliknięcie wraca na "/" -->
         <a class="d-inline-block" href="/">
             <img src="images/logo.png" alt="WlodCar" height="32" />
         </a>
 
         <AuthorizeView>
             <Authorized>
-                <NavLink class="nav-link" href="Account/Manage">Moje konto</NavLink>
-                <NavLink class="nav-link" href="/Account/Logout">Wyloguj</NavLink>
+                <div class="d-flex gap-3">
+                    <NavLink class="nav-link" href="Account/Manage">Moje konto</NavLink>
+                    <form action="Account/Logout" method="post" class="d-inline">
+                        <AntiforgeryToken />
+                        <input type="hidden" name="ReturnUrl" value="@currentUrl" />
+                        <button type="submit" class="btn btn-link nav-link p-0">Wyloguj</button>
+                    </form>
+                </div>
             </Authorized>
 
             <NotAuthorized>
-                <NavLink class="nav-link" href="Account/Login">Logowanie</NavLink>
-                <NavLink class="nav-link" href="Account/Register">Rejestracja</NavLink>
+                <div class="d-flex gap-3">
+                    <NavLink class="nav-link" href="Account/Login">Logowanie</NavLink>
+                    <NavLink class="nav-link" href="Account/Register">Rejestracja</NavLink>
+                </div>
             </NotAuthorized>
         </AuthorizeView>
     </div>
@@ -35,41 +45,86 @@
 
             <div class="collapse navbar-collapse justify-content-center" id="mainNav">
                 <ul class="navbar-nav fw-semibold gap-lg-5">
-                    <li class="nav-item">
-                        <NavLink class="nav-link" href="/" Match="NavLinkMatch.All">
-                            Strona główna
-                        </NavLink>
-                    </li>
-                    <li class="nav-item">
-                        <NavLink class="nav-link" href="/calculator">
-                            Kalkulator
-                        </NavLink>
-                    </li>
                     <AuthorizeView>
                         <Authorized>
-                            <li class="nav-item">
-                                <NavLink class="nav-link" href="/rezerwacja">
-                                    Rezerwacja
-                                </NavLink>
-                            </li>
-                            <li class="nav-item">
-                                <NavLink class="nav-link" href="/moje-rezerwacje">
-                                    Moje Rezerwacje
-                                </NavLink>
-                            </li>
+                            @if (isAdmin)
+                            {
+                                <!-- Menu dla admina -->
+                                <li class="nav-item">
+                                    <NavLink class="nav-link" href="/admin" Match="NavLinkMatch.All">
+                                        Strona główna
+                                    </NavLink>
+                                </li>
+                                <li class="nav-item">
+                                    <NavLink class="nav-link" href="/admin/fleet">
+                                        Zarządzanie flotą
+                                    </NavLink>
+                                </li>
+                                <li class="nav-item">
+                                    <NavLink class="nav-link" href="/admin/users">
+                                        Zarządzanie użytkownikami
+                                    </NavLink>
+                                </li>
+                            }
+                            else
+                            {
+                                <!-- Menu dla zwykłego zalogowanego użytkownika -->
+                                <li class="nav-item">
+                                    <NavLink class="nav-link" href="/" Match="NavLinkMatch.All">
+                                        Strona główna
+                                    </NavLink>
+                                </li>
+                                <li class="nav-item">
+                                    <NavLink class="nav-link" href="/calculator">
+                                        Kalkulator
+                                    </NavLink>
+                                </li>
+                                <li class="nav-item">
+                                    <NavLink class="nav-link" href="/rezerwacja">
+                                        Rezerwacja
+                                    </NavLink>
+                                </li>
+                                <li class="nav-item">
+                                    <NavLink class="nav-link" href="/moje-rezerwacje">
+                                        Moje Rezerwacje
+                                    </NavLink>
+                                </li>
+                                <li class="nav-item">
+                                    <NavLink class="nav-link" href="/offer">
+                                        Oferta
+                                    </NavLink>
+                                </li>
+                                <li class="nav-item">
+                                    <NavLink class="nav-link" href="/contact">
+                                        Kontakt
+                                    </NavLink>
+                                </li>
+                            }
                         </Authorized>
-                        
+                        <NotAuthorized>
+                            <!-- Menu dla niezalogowanego użytkownika -->
+                            <li class="nav-item">
+                                <NavLink class="nav-link" href="/" Match="NavLinkMatch.All">
+                                    Strona główna
+                                </NavLink>
+                            </li>
+                            <li class="nav-item">
+                                <NavLink class="nav-link" href="/calculator">
+                                    Kalkulator
+                                </NavLink>
+                            </li>
+                            <li class="nav-item">
+                                <NavLink class="nav-link" href="/offer">
+                                    Oferta
+                                </NavLink>
+                            </li>
+                            <li class="nav-item">
+                                <NavLink class="nav-link" href="/contact">
+                                    Kontakt
+                                </NavLink>
+                            </li>
+                        </NotAuthorized>
                     </AuthorizeView>
-                    <li class="nav-item">
-                        <NavLink class="nav-link" href="/offer">
-                            Oferta
-                        </NavLink>
-                    </li>
-                    <li class="nav-item">
-                        <NavLink class="nav-link" href="/contact">
-                            Kontakt
-                        </NavLink>
-                    </li>
                 </ul>
             </div>
         </nav>
@@ -78,19 +133,34 @@
 
 @code {
     private string? currentUrl;
+    private bool isAdmin = false;
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
         currentUrl = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
         NavigationManager.LocationChanged += OnLocationChanged;
+
+        await CheckIfAdmin();
+    }
+
+    private async Task CheckIfAdmin()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var userEmail = authState.User?.Identity?.Name;
+        isAdmin = userEmail?.Contains("@wlodcar", StringComparison.OrdinalIgnoreCase) ?? false;
+        StateHasChanged();
     }
 
     private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
     {
         currentUrl = NavigationManager.ToBaseRelativePath(e.Location);
-        StateHasChanged();
+
+        // Wywołaj CheckIfAdmin asynchronicznie bez blokowania
+        _ = InvokeAsync(async () =>
+        {
+            await CheckIfAdmin();
+        });
     }
 
     public void Dispose() => NavigationManager.LocationChanged -= OnLocationChanged;
 }
-

@@ -1,0 +1,184 @@
+﻿@page "/admin/car-status"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using Microsoft.EntityFrameworkCore
+@using WlodCar.Data.Entities
+@using Microsoft.AspNetCore.Components.Authorization
+@inject ApplicationDbContext Db
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Nav
+
+<PageTitle>Status samochodów - WlodCar</PageTitle>
+
+@if (!isAdmin)
+{
+    <div class="alert alert-danger">
+        <i class="bi bi-exclamation-triangle"></i> Brak uprawnień do tej strony.
+    </div>
+}
+else
+{
+    <div class="container my-4">
+        <h2 class="mb-4">
+            <i class="bi bi-car-front"></i> Status wszystkich samochodów
+        </h2>
+
+        @if (cars == null)
+        {
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Ładowanie...</span>
+            </div>
+        }
+        else
+        {
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle"></i> 
+                <strong>Legenda:</strong> 
+                <span class="badge bg-success">Dostępny</span> = IsAvailable=true i InService=false | 
+                <span class="badge bg-warning">W serwisie</span> = InService=true | 
+                <span class="badge bg-danger">Niedostępny</span> = IsAvailable=false
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-bordered">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Nazwa</th>
+                            <th>Marka</th>
+                            <th>Model</th>
+                            <th>IsAvailable</th>
+                            <th>InService</th>
+                            <th>Status faktyczny</th>
+                            <th>Widoczny w rezerwacji?</th>
+                            <th>Akcje</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var car in cars)
+                        {
+                            <tr>
+                                <td>@car.Id</td>
+                                <td>@car.Name</td>
+                                <td>@car.Brand</td>
+                                <td>@car.Model</td>
+                                <td>
+                                    <span class="badge @(car.IsAvailable ? "bg-success" : "bg-danger")">
+                                        @car.IsAvailable
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="badge @(car.InService ? "bg-warning" : "bg-success")">
+                                        @car.InService
+                                    </span>
+                                </td>
+                                <td>
+                                    @if (car.InService)
+                                    {
+                                        <span class="badge bg-warning">W serwisie</span>
+                                    }
+                                    else if (car.IsAvailable)
+                                    {
+                                        <span class="badge bg-success">Dostępny</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-danger">Niedostępny</span>
+                                    }
+                                </td>
+                                <td>
+                                    @if (car.IsAvailable && !car.InService)
+                                    {
+                                        <span class="text-success"><i class="bi bi-check-circle"></i> TAK</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-danger"><i class="bi bi-x-circle"></i> NIE</span>
+                                    }
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-primary" @onclick="() => ToggleService(car)">
+                                        @(car.InService ? "Wyjmij z serwisu" : "Wyślij do serwisu")
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-secondary ms-1" @onclick="() => ToggleAvailability(car)">
+                                        @(car.IsAvailable ? "Ustaw niedostępny" : "Ustaw dostępny")
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="alert alert-warning mt-4">
+                <h5>Informacje debugowania:</h5>
+                <p>Samochody widoczne w procesie rezerwacji (Step2Cars):</p>
+                <ul>
+                    @foreach (var car in cars.Where(c => c.IsAvailable && !c.InService))
+                    {
+                        <li>@car.Brand @car.Model (ID: @car.Id) - @car.Name</li>
+                    }
+                </ul>
+                @if (!cars.Any(c => c.IsAvailable && !c.InService))
+                {
+                    <p class="text-danger fw-bold">UWAGA: Żaden samochód nie spełnia kryteriów dostępności!</p>
+                }
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private bool isAdmin = false;
+    private List<Car>? cars;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var userEmail = authState.User?.Identity?.Name;
+        isAdmin = userEmail?.Contains("@wlodcar", StringComparison.OrdinalIgnoreCase) ?? false;
+
+        if (!isAdmin)
+        {
+            Nav.NavigateTo("/");
+            return;
+        }
+
+        await LoadCars();
+    }
+
+    private async Task LoadCars()
+    {
+        cars = await Db.Cars.OrderBy(c => c.Id).ToListAsync();
+    }
+
+    private async Task ToggleService(Car car)
+    {
+        car.InService = !car.InService;
+        
+        // Jeśli samochód idzie do serwisu, ustaw też jako niedostępny
+        if (car.InService)
+        {
+            car.IsAvailable = false;
+        }
+        
+        Db.Cars.Update(car);
+        await Db.SaveChangesAsync();
+        await LoadCars();
+    }
+
+    private async Task ToggleAvailability(Car car)
+    {
+        car.IsAvailable = !car.IsAvailable;
+        
+        // Jeśli samochód staje się dostępny, upewnij się że nie jest w serwisie
+        if (car.IsAvailable)
+        {
+            car.InService = false;
+        }
+        
+        Db.Cars.Update(car);
+        await Db.SaveChangesAsync();
+        await LoadCars();
+    }
+}

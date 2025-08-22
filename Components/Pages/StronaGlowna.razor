@@ -1,90 +1,154 @@
 ﻿@page "/"
+@rendermode InteractiveServer
 @using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Components.Authorization
 @inject NavigationManager Nav
+@inject AuthenticationStateProvider AuthStateProvider
 
-<PageTitle>WlodCar – wypożycz auto</PageTitle>
+<PageTitle>WlodCar -- wypożycz auto</PageTitle>
 
-<section class="wc-hero text-center text-white position-relative">
-    <img src="images/hero.jpg" class="w-100 h-100 object-cover" alt="auto w ruchu">
+@if (isLoading)
+{
+    <div class="text-center p-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Ładowanie...</span>
+        </div>
+    </div>
+}
+else if (!shouldShowHomePage)
+{
+    <!-- Pusta strona - przekierowanie w toku -->
+    <div class="text-center p-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Przekierowywanie...</span>
+        </div>
+    </div>
+}
+else
+{
+    <!-- Normalna strona główna dla zwykłych użytkowników i niezalogowanych -->
+    <section class="wc-hero text-center text-white position-relative">
+        <img src="images/hero.jpg" class="w-100 h-100 object-cover" alt="auto w ruchu">
 
-    <div class="wc-hero-overlay container">
-        <h1 class="display-4 fw-bold">Lorem ipsum dolor sit amet.</h1>
-        <p class="lead mb-4">Lorem ipsum dolor sit amet, consectetur.</p>
+        <div class="wc-hero-overlay container">
+            <h1 class="display-4 fw-bold">Twoja podróż zaczyna się tutaj</h1>
+            <p class="lead mb-4">Szeroki wybór aut na każdą okazję. Rezerwuj online w 3 minuty!</p>
 
-        <EditForm Model="@form"
-                  OnValidSubmit="Search"
-                  FormName="quick-search">
-            <DataAnnotationsValidator />
-            <ValidationSummary class="text-danger mb-2" />
+            <EditForm Model="@form"
+                      OnValidSubmit="Search"
+                      FormName="quick-search">
+                <DataAnnotationsValidator />
+                <ValidationSummary class="text-danger mb-2" />
 
-            <div class="wc-search bg-white rounded-pill shadow-lg p-2
-                        d-flex flex-lg-nowrap flex-wrap gap-2 align-items-center">
+                <div class="wc-search bg-white rounded-pill shadow-lg p-2
+                                        d-flex flex-lg-nowrap flex-wrap gap-2 align-items-center">
 
-                <!-- ↓↓↓ lokalizacja już NIE jest wymagana -->
-                <InputSelect class="form-select flex-grow-1"
-                             @bind-Value="form.Location">
-                    <option value="">Wszystkie lokalizacje</option>
-                    <option>Płock</option>
-                    <option>Iława</option>
-                    <option>Wyszków</option>
-                </InputSelect>
+                    <InputSelect class="form-select flex-grow-1"
+                                 @bind-Value="form.Location">
+                        <option value="">Wszystkie lokalizacje</option>
+                        <option>Płock</option>
+                        <option>Iława</option>
+                        <option>Wyszków</option>
+                    </InputSelect>
 
-                <InputDate class="form-control flex-grow-1"
-                           @bind-Value="form.StartDate" />
+                    <InputDate class="form-control flex-grow-1"
+                               @bind-Value="form.StartDate" />
 
-                <InputDate class="form-control flex-grow-1"
-                           @bind-Value="form.EndDate" />
+                    <InputDate class="form-control flex-grow-1"
+                               @bind-Value="form.EndDate" />
 
-                <button class="btn btn-wc-orange px-4" type="submit">
-                    Szukaj
-                </button>
+                    <button class="btn btn-wc-orange px-4" type="submit">
+                        Szukaj
+                    </button>
+                </div>
+            </EditForm>
+        </div>
+    </section>
+
+    <!-- ===== PROGRAM LOJALNOŚCIOWY / OFERTA ===== -->
+    <section class="container my-5">
+
+        <div class="wc-promo row g-0 overflow-hidden rounded-4 mb-4">
+            <div class="col-md-5 wc-promo-text">
+                <span class="badge bg-info-soft text-uppercase fw-semibold small mb-2">Program Lojalnościowy</span>
+                <h3 class="fw-bold mb-3">Zbieraj punkty i oszczędzaj nawet 40%!</h3>
+                <p class="small mb-4">
+                    Stali klienci za każdy wynajem otrzymują punkty lojalnościowe.
+                    Wymień je na rabaty sięgające kilkudziesięciu procent przy kolejnych rezerwacjach.
+                    Im częściej wynajmujesz, tym więcej oszczędzasz!
+                </p>
+                <a class="btn btn-outline-light rounded-pill px-4" href="/offer">Sprawdź ofertę</a>
             </div>
-        </EditForm>
-    </div>
-</section>
-
-<!-- ===== PROMOCJE / OFERTA (bez zmian) ===== -->
-<section class="container my-5">
-
-    <div class="wc-promo row g-0 overflow-hidden rounded-4 mb-4">
-        <div class="col-md-5 wc-promo-text">
-            <span class="badge bg-info-soft text-uppercase fw-semibold small mb-2">Promocja</span>
-            <h3 class="fw-bold mb-3">Lorem ipsum dolor sit amet, consectetur.</h3>
-            <p class="small mb-4">Lorem ipsum dolor sit amet, consectetur.</p>
-            <a class="btn btn-outline-light rounded-pill px-4" href="/offer">Button</a>
+            <div class="col-md-7">
+                <img src="images/promo1.jpg" class="w-100 h-100 object-cover" />
+            </div>
         </div>
-        <div class="col-md-7">
-            <img src="images/promo1.jpg" class="w-100 h-100 object-cover" />
-        </div>
-    </div>
 
-    <div class="wc-promo row g-0 overflow-hidden rounded-4">
-        <div class="col-md-7">
-            <img src="images/promo2.jpg" class="w-100 h-100 object-cover" />
+        <div class="wc-promo row g-0 overflow-hidden rounded-4">
+            <div class="col-md-7">
+                <img src="images/promo2.jpg" class="w-100 h-100 object-cover" />
+            </div>
+            <div class="col-md-5 wc-promo-text">
+                <span class="badge bg-info-soft text-uppercase fw-semibold small mb-2">Gwarancja jakości</span>
+                <h3 class="fw-bold mb-3">Najmłodsza flota w regionie</h3>
+                <p class="small mb-4">
+                    Wszystkie nasze samochody są regularnie serwisowane i nie starsze niż 3 lata.
+                    Oferujemy pełne ubezpieczenie, assistance 24/7 oraz możliwość wynajmu na minuty.
+                    Bez ukrytych kosztów!
+                </p>
+                <a class="btn btn-outline-light rounded-pill px-4" href="/offer">Zobacz auta</a>
+            </div>
         </div>
-        <div class="col-md-5 wc-promo-text">
-            <span class="badge bg-info-soft text-uppercase fw-semibold small mb-2">Oferta</span>
-            <h3 class="fw-bold mb-3">Lorem ipsum dolor sit amet, consectetur.</h3>
-            <p class="small mb-4">Lorem ipsum dolor sit amet, consectetur.</p>
-            <a class="btn btn-outline-light rounded-pill px-4" href="/offer">Button</a>
-        </div>
-    </div>
 
-</section>
+    </section>
+}
 
 @code {
     private readonly SearchForm form = new();
+    private bool isLoading = true;
+    private bool shouldShowHomePage = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+
+            if (authState.User?.Identity?.IsAuthenticated == true)
+            {
+                var userEmail = authState.User.Identity.Name;
+                var isAdmin = userEmail?.Contains("@wlodcar", StringComparison.OrdinalIgnoreCase) ?? false;
+
+                if (isAdmin)
+                {
+                    shouldShowHomePage = false;
+                    // Używamy JavaScript do przekierowania, aby uniknąć NavigationException
+                    Nav.NavigateTo("/admin", forceLoad: true);
+                    return;
+                }
+            }
+        }
+        catch
+        {
+            // Ignoruj błędy autentykacji
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
 
     void Search()
     {
         var query = new Dictionary<string, object?>
-            {
-                ["sd"] = form.StartDate.ToString("yyyy-MM-dd"),
-                ["ed"] = form.EndDate.ToString("yyyy-MM-dd")
-            };
+        {
+            ["sd"] = form.StartDate.ToString("yyyy-MM-dd"),
+            ["ed"] = form.EndDate.ToString("yyyy-MM-dd"),
+            ["available"] = "true" // Domyślnie szukaj tylko dostępnych
+        };
 
         if (!string.IsNullOrWhiteSpace(form.Location))
-            query["loc"] = form.Location;          // dodaj tylko, gdy wybrano
+            query["loc"] = form.Location;
 
         var url = Nav.GetUriWithQueryParameters("/samochody", query);
         Nav.NavigateTo(url, forceLoad: true);
@@ -92,7 +156,6 @@
 
     private sealed class SearchForm
     {
-        /* ← brak atrybutu [Required] */
         public string? Location { get; set; }
 
         [Required]

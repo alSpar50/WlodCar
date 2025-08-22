@@ -7,7 +7,6 @@ using WlodCar.Data;
 using Microsoft.AspNetCore.Identity.UI.Services;
 using WlodCar.Services;
 
-
 var builder = WebApplication.CreateBuilder(args);
 
 /* ----------- 1.  DB + Identity  ---------------------------------- */
@@ -27,16 +26,12 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(opt =>
 .AddEntityFrameworkStores<ApplicationDbContext>()
 .AddDefaultTokenProviders();
 
-
-
 /* ----------- 3.  Blazor + komponenty Identity -------------------- */
 builder.Services.AddRazorComponents()
                 .AddInteractiveServerComponents();
 
 builder.Services.AddCascadingAuthenticationState();
 
-/*  !!! IdentityUserAccessor i RedirectManager dodaj TUTAJ,
-      bo UserManager jest ju¿ w kontenerze */
 builder.Services.AddScoped<IdentityUserAccessor>();
 builder.Services.AddScoped<IdentityRedirectManager>();
 builder.Services.AddScoped<AuthenticationStateProvider,
@@ -44,6 +39,7 @@ builder.Services.AddScoped<AuthenticationStateProvider,
 
 /* ----------- 4.  Inne serwisy ------------------------------------ */
 builder.Services.AddScoped<IAppEmailSender, EmailSender>();
+builder.Services.AddScoped<IEmailService, EmailService>(); // NOWY SERWIS
 
 builder.Services.AddSingleton<ReservationState>();
 builder.Services.AddScoped<IReservationService, ReservationService>();
@@ -51,18 +47,11 @@ builder.Services.AddScoped<ILoyaltyService, LoyaltyService>();
 
 builder.Services.AddSingleton<IEmailSender<ApplicationUser>, ConsoleEmailSender>();
 
-
-
-//builder.Services.AddSingleton<
-// IEmailSender<ApplicationUser>,
-// WlodCar.Components.Account.NoOpEmailSender<ApplicationUser>>();
-
+// Dodaj obs³ugê BackgroundService dla przypomnieñ
+builder.Services.AddHostedService<ReminderService>();
 
 /* ----------- 5.  Budujemy aplikacjê ------------------------------ */
 var app = builder.Build();
-
-
-
 
 /* ----------- 6.  Middleware -------------------------------------- */
 if (app.Environment.IsDevelopment())
@@ -72,23 +61,22 @@ if (app.Environment.IsDevelopment())
 else
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
-    app.UseHsts();                      // HSTS – patrz artyku³ MS Learn
+    app.UseHsts();
 }
 
-app.UseHttpsRedirection();              // middleware przekierowuj¹cy HTTP -> HTTPS
+app.UseHttpsRedirection();
 app.UseStaticFiles();
 
 app.UseRouting();
 
-// GET /Account/Logout  – kasuje cookie i robi 302 /
 app.MapGet("/Account/Logout",
     async (HttpContext http, SignInManager<ApplicationUser> signIn) =>
     {
-        await signIn.SignOutAsync();              // usuwa cookie
-        http.Response.Redirect("/");              // wróæ na Start
+        await signIn.SignOutAsync();
+        http.Response.Redirect("/");
     });
 
-app.UseAuthentication();                // konieczne po AddAuthentication
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.UseAntiforgery();
@@ -105,7 +93,6 @@ using (var scope = app.Services.CreateScope())
     await DbSeeder.SeedAsync(db);
 }
 
-app.Run();
 
-/* Inicjalizacja danych/ ról / admina */
-await DbInitializer.SeedAsync(app.Services);
+
+app.Run();

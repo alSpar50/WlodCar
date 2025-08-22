@@ -1,0 +1,441 @@
+﻿@page "/admin"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using Microsoft.EntityFrameworkCore
+@using WlodCar.Data.Entities
+@using Microsoft.AspNetCore.Components.Authorization
+@using WlodCar.Services
+@inject ApplicationDbContext Db
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+@inject IEmailService EmailService
+
+<PageTitle>Panel Administracyjny - WlodCar</PageTitle>
+
+@if (isLoading)
+{
+    <div class="text-center p-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Ładowanie...</span>
+        </div>
+    </div>
+}
+else if (!isAdmin)
+{
+    <div class="alert alert-danger">
+        <i class="bi bi-exclamation-triangle"></i> Brak uprawnień do tej strony.
+        <p class="mt-2">Przekierowanie za chwilę...</p>
+    </div>
+}
+else
+{
+    <div class="container my-4">
+        <div class="row mb-4">
+            <div class="col">
+                <h2>Panel Administracyjny WlodCar</h2>
+                <p class="text-muted">Witaj, @userEmail!</p>
+            </div>
+        </div>
+
+        <!-- Statystyki -->
+        <div class="row g-3 mb-4">
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <i class="bi bi-car-front display-4 text-primary"></i>
+                        <h5 class="card-title mt-2">@totalCars</h5>
+                        <p class="card-text text-muted">Wszystkie samochody</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <i class="bi bi-check-circle display-4 text-success"></i>
+                        <h5 class="card-title mt-2">@availableCars</h5>
+                        <p class="card-text text-muted">Dostępne</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <i class="bi bi-wrench display-4 text-warning"></i>
+                        <h5 class="card-title mt-2">@inServiceCars</h5>
+                        <p class="card-text text-muted">W serwisie</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <i class="bi bi-exclamation-triangle display-4 text-danger"></i>
+                        <h5 class="card-title mt-2">@overdueServiceCars</h5>
+                        <p class="card-text text-muted">Wymaga serwisu</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Statystyki rezerwacji -->
+        <div class="row g-3 mb-4">
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h6 class="card-subtitle mb-2 text-muted">Wszystkie rezerwacje</h6>
+                        <h3 class="card-title">@totalReservations</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h6 class="card-subtitle mb-2 text-muted">Aktywne rezerwacje</h6>
+                        <h3 class="card-title">@activeReservations</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h6 class="card-subtitle mb-2 text-muted">Zarejestrowani użytkownicy</h6>
+                        <h3 class="card-title">@totalUsers</h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Szybkie akcje -->
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <i class="bi bi-speedometer2"></i> Szybkie akcje
+                    </div>
+                    <div class="card-body">
+                        <div class="d-grid gap-2">
+                            <a href="/admin/fleet" class="btn btn-outline-primary">
+                                <i class="bi bi-car-front"></i> Zarządzanie flotą
+                            </a>
+                            <a href="/admin/users" class="btn btn-outline-primary">
+                                <i class="bi bi-people"></i> Zarządzanie użytkownikami
+                            </a>
+                            <a href="/admin/reservations" class="btn btn-outline-primary">
+                                <i class="bi bi-calendar-check"></i> Przegląd rezerwacji
+                            </a>
+                            <a href="/admin/car-status" class="btn btn-outline-warning">
+                                <i class="bi bi-wrench-adjustable"></i> Status samochodów (Debug)
+                            </a>
+
+                            <!-- PRZYCISK WYSYŁANIA EMAILA DO KLIENTA -->
+                            <button class="btn btn-info" @onclick="OpenEmailModal">
+                                <i class="bi bi-envelope-at"></i> Wyślij wiadomość do klienta
+                            </button>
+
+                            <!-- MODAL DO WYSYŁANIA EMAILA -->
+                            @if (showEmailModal)
+                            {
+                                <div class="modal show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
+                                    <div class="modal-dialog modal-lg">
+                                        <div class="modal-content">
+                                            <div class="modal-header bg-info text-white">
+                                                <h5 class="modal-title">
+                                                    <i class="bi bi-envelope"></i> Wyślij wiadomość do klienta
+                                                </h5>
+                                                <button type="button" class="btn-close btn-close-white"
+                                                        @onclick="CloseEmailModal"></button>
+                                            </div>
+                                            <div class="modal-body">
+                                                <div class="mb-3">
+                                                    <label class="form-label">Adres email odbiorcy: <span class="text-danger">*</span></label>
+                                                    <input type="email" class="form-control" @bind="emailForm.RecipientEmail"
+                                                           placeholder="np. klient@example.com"
+                                                           disabled="@isEmailSending" />
+                                                </div>
+
+                                                <div class="mb-3">
+                                                    <label class="form-label">Temat wiadomości: <span class="text-danger">*</span></label>
+                                                    <input type="text" class="form-control" @bind="emailForm.Subject"
+                                                           placeholder="np. Informacja o promocji"
+                                                           disabled="@isEmailSending" />
+                                                </div>
+
+                                                <div class="mb-3">
+                                                    <label class="form-label">Treść wiadomości: <span class="text-danger">*</span></label>
+                                                    <textarea class="form-control" @bind="emailForm.Message"
+                                                              rows="8"
+                                                              placeholder="Wpisz treść wiadomości..."
+                                                              disabled="@isEmailSending"></textarea>
+                                                    <small class="text-muted">
+                                                        Wiadomość zostanie wysłana z stopką WlodCar.
+                                                    </small>
+                                                </div>
+
+                                                <div class="form-check mb-3">
+                                                    <input class="form-check-input" type="checkbox"
+                                                           @bind="emailForm.SendCopy" id="sendCopyCheck"
+                                                           disabled="@isEmailSending">
+                                                    <label class="form-check-label" for="sendCopyCheck">
+                                                        Wyślij kopię na mój adres (@userEmail) (admin@wlodcar.pl nie istnieje, funkcja zadziała tylko z prawdziwym adresem)
+                                                    </label>
+                                                </div>
+
+                                                @if (!string.IsNullOrEmpty(emailSendResult))
+                                                {
+                                                    <div class="alert @(emailSendSuccess ? "alert-success" : "alert-danger") d-flex align-items-center">
+                                                        <i class="bi @(emailSendSuccess ? "bi-check-circle" : "bi-exclamation-triangle") me-2"></i>
+                                                        <div>@emailSendResult</div>
+                                                    </div>
+                                                }
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-secondary"
+                                                        @onclick="CloseEmailModal"
+                                                        disabled="@isEmailSending">
+                                                    Anuluj
+                                                </button>
+                                                <button type="button" class="btn btn-primary"
+                                                        @onclick="SendCustomEmail"
+                                                        disabled="@(!IsEmailFormValid() || isEmailSending)">
+                                                    @if (isEmailSending)
+                                                    {
+                                                        <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                                        <span>Wysyłanie...</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <i class="bi bi-send"></i>
+                                                        <span> Wyślij wiadomość</span>
+                                                    }
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header bg-warning">
+                        <i class="bi bi-exclamation-triangle"></i> Wymagają uwagi
+                    </div>
+                    <div class="card-body">
+                        @if (carsNeedingService?.Any() == true)
+                        {
+                            <h6>Samochody wymagające serwisu:</h6>
+                            <ul class="list-unstyled">
+                                @foreach (var car in carsNeedingService.Take(5))
+                                {
+                                    <li class="mb-2">
+                                        <i class="bi bi-exclamation-circle text-danger"></i>
+                                        <strong>@car.Brand @car.Model</strong> (@car.RegistrationNumber)
+                                        @if (car.NextServiceDate.HasValue)
+                                        {
+                                            <span class="text-muted">- termin: @car.NextServiceDate.Value.ToString("dd.MM.yyyy")</span>
+                                        }
+                                    </li>
+                                }
+                            </ul>
+                        }
+                        else
+                        {
+                            <p class="text-muted">Brak pilnych spraw do załatwienia.</p>
+                        }
+
+                        @if (todayReservations > 0)
+                        {
+                            <hr />
+                            <p>
+                                <i class="bi bi-calendar-event text-info"></i>
+                                <strong>@todayReservations</strong> rezerwacji na dziś
+                            </p>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private bool isAdmin = false;
+    private bool isLoading = true;
+    private string? userEmail;
+
+    // Formularz emaila
+    private bool showEmailModal = false;
+    private bool isEmailSending = false;
+    private string emailSendResult = "";
+    private bool emailSendSuccess = false;
+
+    private EmailFormModel emailForm = new();
+
+    private class EmailFormModel
+    {
+        public string RecipientEmail { get; set; } = "";
+        public string Subject { get; set; } = "";
+        public string Message { get; set; } = "";
+        public bool SendCopy { get; set; } = false;
+    }
+
+    // Statystyki
+    private int totalCars = 0;
+    private int availableCars = 0;
+    private int inServiceCars = 0;
+    private int overdueServiceCars = 0;
+    private int totalReservations = 0;
+    private int activeReservations = 0;
+    private int todayReservations = 0;
+    private int totalUsers = 0;
+    private List<Car>? carsNeedingService;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+            userEmail = authState.User?.Identity?.Name;
+            isAdmin = userEmail?.Contains("@wlodcar", StringComparison.OrdinalIgnoreCase) ?? false;
+
+            if (!isAdmin)
+            {
+                isLoading = false;
+                StateHasChanged();
+
+                // Opóźnione przekierowanie przez JavaScript
+                await Task.Delay(1000);
+                await JS.InvokeVoidAsync("eval", "window.location.href = '/'");
+                return;
+            }
+
+            await LoadStatistics();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Błąd inicjalizacji: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task LoadStatistics()
+    {
+        try
+        {
+            // Statystyki samochodów
+            var cars = await Db.Cars.ToListAsync();
+            totalCars = cars.Count;
+            availableCars = cars.Count(c => c.IsAvailable && !c.InService);
+            inServiceCars = cars.Count(c => c.InService);
+            overdueServiceCars = cars.Count(c => c.NextServiceDate < DateTime.Now && !c.InService);
+
+            carsNeedingService = cars
+                .Where(c => c.NextServiceDate < DateTime.Now)
+                .OrderBy(c => c.NextServiceDate)
+                .ToList();
+
+            // Statystyki rezerwacji
+            totalReservations = await Db.Reservations.CountAsync();
+
+            var today = DateTime.Today;
+            var tomorrow = today.AddDays(1);
+
+            // Aktywne rezerwacje (trwające teraz)
+            activeReservations = await Db.Reservations
+                .CountAsync(r => r.DateFrom <= today && r.DateTo >= today);
+
+            // Rezerwacje rozpoczynające się dziś
+            todayReservations = await Db.Reservations
+                .CountAsync(r => r.DateFrom >= today && r.DateFrom < tomorrow);
+
+            // Liczba użytkowników
+            totalUsers = await Db.Users.CountAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Błąd podczas ładowania statystyk: {ex.Message}");
+        }
+    }
+
+    private void OpenEmailModal()
+    {
+        showEmailModal = true;
+        emailSendResult = "";
+        emailForm = new EmailFormModel();
+    }
+
+    private void CloseEmailModal()
+    {
+        showEmailModal = false;
+        emailSendResult = "";
+        emailForm = new EmailFormModel();
+    }
+
+    private bool IsEmailFormValid()
+    {
+        return !string.IsNullOrWhiteSpace(emailForm.RecipientEmail) &&
+               emailForm.RecipientEmail.Contains("@") &&
+               !string.IsNullOrWhiteSpace(emailForm.Subject) &&
+               !string.IsNullOrWhiteSpace(emailForm.Message);
+    }
+
+    private async Task SendCustomEmail()
+    {
+        if (!IsEmailFormValid())
+        {
+            emailSendResult = "Wypełnij wszystkie wymagane pola!";
+            emailSendSuccess = false;
+            return;
+        }
+
+        isEmailSending = true;
+        emailSendResult = "";
+        StateHasChanged();
+
+        try
+        {
+            // Wyślij główny email
+            await EmailService.SendCustomMessageAsync(
+                emailForm.RecipientEmail,
+                emailForm.Subject,
+                emailForm.Message
+            );
+
+            // Wyślij kopię jeśli zaznaczono
+            if (emailForm.SendCopy && !string.IsNullOrEmpty(userEmail))
+            {
+                var copySubject = $"[KOPIA] {emailForm.Subject}";
+                var copyMessage = $"<p><em>To jest kopia wiadomości wysłanej do: {emailForm.RecipientEmail}</em></p><hr/>{emailForm.Message}";
+                await EmailService.SendCustomMessageAsync(userEmail, copySubject, copyMessage);
+            }
+
+            emailSendResult = $"Wiadomość została wysłana do: {emailForm.RecipientEmail}";
+            if (emailForm.SendCopy)
+            {
+                emailSendResult += $" (kopia wysłana na: {userEmail})";
+            }
+            emailSendSuccess = true;
+
+            // Wyczyść formularz po sukcesie
+            emailForm = new EmailFormModel();
+        }
+        catch (Exception ex)
+        {
+            emailSendResult = $"Błąd wysyłania: {ex.Message}";
+            emailSendSuccess = false;
+            Console.WriteLine($"Szczegóły błędu email: {ex}");
+        }
+        finally
+        {
+            isEmailSending = false;
+            StateHasChanged();
+        }
+    }
+}

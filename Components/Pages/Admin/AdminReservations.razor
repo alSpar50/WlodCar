@@ -1,0 +1,497 @@
+﻿@page "/admin/reservations"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using Microsoft.EntityFrameworkCore
+@using WlodCar.Data.Entities
+@using Microsoft.AspNetCore.Components.Authorization
+@inject ApplicationDbContext Db
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Nav
+
+<PageTitle>Zarządzanie rezerwacjami - WlodCar</PageTitle>
+
+@if (!isAdmin)
+{
+    <div class="alert alert-danger">
+        <i class="bi bi-exclamation-triangle"></i> Brak uprawnień do tej strony.
+    </div>
+}
+else
+{
+    <div class="container my-4">
+        <h2 class="mb-4">
+            <i class="bi bi-calendar-check"></i> Zarządzanie rezerwacjami
+        </h2>
+
+        <!-- Filtry -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <label class="form-label">Status</label>
+                        <select class="form-select" @onchange="FilterByStatus">
+                            <option value="">Wszystkie</option>
+                            <option value="@ReservationStatus.Active">Aktywne</option>
+                            <option value="@ReservationStatus.Cancelled">Anulowane</option>
+                            <option value="@ReservationStatus.Finished">Zakończone</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Samochód</label>
+                        <select class="form-select" @onchange="FilterByCar">
+                            <option value="">Wszystkie</option>
+                            @if (cars != null)
+                            {
+                                @foreach (var car in cars)
+                                {
+                                    <option value="@car.Id">@car.Brand @car.Model (@car.RegistrationNumber)</option>
+                                }
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Od daty</label>
+                        <input type="date" class="form-control" @onchange="FilterByDateFrom" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Do daty</label>
+                        <input type="date" class="form-control" @onchange="FilterByDateTo" />
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Statystyki -->
+        <div class="row g-3 mb-4">
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h5 class="card-title">@totalReservations</h5>
+                        <p class="card-text text-muted">Wszystkie rezerwacje</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h5 class="card-title text-success">@activeReservations</h5>
+                        <p class="card-text text-muted">Aktywne</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h5 class="card-title text-warning">@cancelledReservations</h5>
+                        <p class="card-text text-muted">Anulowane</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h5 class="card-title text-info">@finishedReservations</h5>
+                        <p class="card-text text-muted">Zakończone</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Lista rezerwacji -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Lista rezerwacji (@(filteredReservations?.Count ?? 0))</h5>
+            </div>
+            <div class="card-body">
+                @if (filteredReservations == null)
+                {
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Ładowanie...</span>
+                    </div>
+                }
+                else if (!filteredReservations.Any())
+                {
+                    <p class="text-muted">Brak rezerwacji spełniających kryteria.</p>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Użytkownik</th>
+                                    <th>Samochód</th>
+                                    <th>Od</th>
+                                    <th>Do</th>
+                                    <th>Dni</th>
+                                    <th>Kwota</th>
+                                    <th>Status</th>
+                                    <th>Akcje</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var reservation in filteredReservations)
+                                {
+                                    var car = GetCarById(reservation.CarId);
+                                    var user = GetUserById(reservation.UserId);
+                                    <tr class="@GetRowClass(reservation)">
+                                        <td>#@reservation.Id</td>
+                                        <td>
+                                            @if (user != null)
+                                            {
+                                                <small>@user.Email</small>
+                                            }
+                                            else
+                                            {
+                                                <small class="text-muted">@reservation.UserId</small>
+                                            }
+                                        </td>
+                                        <td>
+                                            @if (car != null)
+                                            {
+                                                <span>@car.Brand @car.Model</span>
+                                
+                                                <br />
+                                                <small class="text-muted">@car.RegistrationNumber</small>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted">Nieznany samochód</span>
+                                            }
+                                        </td>
+                                        <td>@reservation.DateFrom.ToString("dd.MM.yyyy")</td>
+                                        <td>@reservation.DateTo.ToString("dd.MM.yyyy")</td>
+                                        <td>@((reservation.DateTo - reservation.DateFrom).Days + 1)</td>
+                                        <td>@reservation.TotalPrice.ToString("C")</td>
+                                        <td>
+                                            <span class="badge @GetStatusBadgeClass(reservation.Status)">
+                                                @GetStatusText(reservation.Status)
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <button class="btn btn-sm btn-outline-primary" @onclick="() => ViewDetails(reservation)">
+                                                <i class="bi bi-eye"></i>
+                                            </button>
+                                            @if (reservation.Status == ReservationStatus.Active)
+                                            {
+                                                <button class="btn btn-sm btn-outline-warning" @onclick="() => CancelReservation(reservation.Id)">
+                                                    <i class="bi bi-x-circle"></i>
+                                                </button>
+                                            }
+                                            @if (reservation.Status != ReservationStatus.Finished)
+                                            {
+                                                <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteReservation(reservation.Id)">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- Modal ze szczegółami -->
+        @if (selectedReservation != null)
+        {
+            var selectedCar = GetCarById(selectedReservation.CarId);
+            var selectedUser = GetUserById(selectedReservation.UserId);
+            <div class="modal show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Szczegóły rezerwacji #@selectedReservation.Id</h5>
+                            <button type="button" class="btn-close" @onclick="CloseDetails"></button>
+                        </div>
+                        <div class="modal-body">
+                            <h6>Informacje o rezerwacji</h6>
+                            <p>
+                                <strong>Status:</strong>
+                                <span class="badge @GetStatusBadgeClass(selectedReservation.Status)">
+                                    @GetStatusText(selectedReservation.Status)
+                                </span><br />
+                                <strong>Data od:</strong> @selectedReservation.DateFrom.ToString("dd.MM.yyyy HH:mm")<br />
+                                <strong>Data do:</strong> @selectedReservation.DateTo.ToString("dd.MM.yyyy HH:mm")<br />
+                                <strong>Liczba dni:</strong> @((selectedReservation.DateTo - selectedReservation.DateFrom).Days + 1)<br />
+                                <strong>Kwota całkowita:</strong> @selectedReservation.TotalPrice.ToString("C")
+                            </p>
+
+                            <h6 class="mt-3">Samochód</h6>
+                            <p>
+                                @if (selectedCar != null)
+                                {
+                                    <strong>Marka i model:</strong> 
+                                    @selectedCar.Brand@selectedCar.Model
+                        
+                                    <br />
+                                    <strong>Nr rejestracyjny:</strong>
+ 
+                                    @selectedCar.RegistrationNumber
+                        
+                                    <br />
+                                    <strong>Cena za dobę:</strong>
+ 
+                                    @selectedCar.PricePerDay.ToString("C")
+                                }
+                                else
+                                {
+                                    <text>Brak danych o samochodzie</text>
+                                }
+                            </p>
+
+                            <h6 class="mt-3">Użytkownik</h6>
+                            <p>
+                                @if (selectedUser != null)
+                                {
+                                    <strong>Email:</strong> 
+                                    @selectedUser.Email
+                        
+                                    <br />
+                                    <strong>ID:</strong>
+ 
+                                    @selectedUser.Id
+                                }
+                                else
+                                {
+                                    <strong>ID użytkownika:</strong> 
+                                    @selectedReservation.UserId
+                                }
+                            </p>
+                        </div>
+                        <div class="modal-footer">
+                            @if (selectedReservation.Status == ReservationStatus.Active)
+                            {
+                                <button type="button" class="btn btn-warning" @onclick="() => CancelReservation(selectedReservation.Id)">
+                                    Anuluj rezerwację
+                                </button>
+                            }
+                            <button type="button" class="btn btn-secondary" @onclick="CloseDetails">Zamknij</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private bool isAdmin = false;
+    private List<Reservation>? reservations;
+    private List<Reservation>? filteredReservations;
+    private List<Car>? cars;
+    private List<ApplicationUser>? users;
+    private Reservation? selectedReservation;
+
+    // Statystyki
+    private int totalReservations = 0;
+    private int activeReservations = 0;
+    private int cancelledReservations = 0;
+    private int finishedReservations = 0;
+
+    // Filtry
+    private ReservationStatus? statusFilter;
+    private string? carFilter;
+    private DateTime? dateFromFilter;
+    private DateTime? dateToFilter;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var userEmail = authState.User?.Identity?.Name;
+        isAdmin = userEmail?.Contains("@wlodcar", StringComparison.OrdinalIgnoreCase) ?? false;
+
+        if (!isAdmin)
+        {
+            Nav.NavigateTo("/");
+            return;
+        }
+
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        try
+        {
+            cars = await Db.Cars.OrderBy(c => c.Brand).ThenBy(c => c.Model).ToListAsync();
+            users = await Db.Users.ToListAsync();
+            reservations = await Db.Reservations
+                .OrderByDescending(r => r.DateFrom)
+                .ToListAsync();
+
+            ApplyFilters();
+            CalculateStatistics();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Błąd podczas ładowania danych: {ex.Message}");
+        }
+    }
+
+    private Car? GetCarById(string carId)
+    {
+        if (string.IsNullOrEmpty(carId) || !int.TryParse(carId, out var id))
+            return null;
+        return cars?.FirstOrDefault(c => c.Id == id);
+    }
+
+    private ApplicationUser? GetUserById(Guid userId)
+    {
+        return users?.FirstOrDefault(u => u.Id == userId.ToString());
+    }
+
+    private void ApplyFilters()
+    {
+        filteredReservations = reservations;
+
+        if (filteredReservations == null) return;
+
+        // Filtr statusu
+        if (statusFilter.HasValue)
+        {
+            filteredReservations = filteredReservations.Where(r => r.Status == statusFilter.Value).ToList();
+        }
+
+        // Filtr samochodu
+        if (!string.IsNullOrEmpty(carFilter))
+        {
+            filteredReservations = filteredReservations.Where(r => r.CarId == carFilter).ToList();
+        }
+
+        // Filtr dat
+        if (dateFromFilter.HasValue)
+        {
+            filteredReservations = filteredReservations.Where(r => r.DateFrom >= dateFromFilter.Value).ToList();
+        }
+
+        if (dateToFilter.HasValue)
+        {
+            filteredReservations = filteredReservations.Where(r => r.DateTo <= dateToFilter.Value).ToList();
+        }
+    }
+
+    private void CalculateStatistics()
+    {
+        if (reservations == null) return;
+
+        totalReservations = reservations.Count;
+        activeReservations = reservations.Count(r => r.Status == ReservationStatus.Active);
+        cancelledReservations = reservations.Count(r => r.Status == ReservationStatus.Cancelled);
+        finishedReservations = reservations.Count(r => r.Status == ReservationStatus.Finished);
+    }
+
+    private void FilterByStatus(ChangeEventArgs e)
+    {
+        var value = e.Value?.ToString();
+        statusFilter = string.IsNullOrEmpty(value) ? null : Enum.Parse<ReservationStatus>(value);
+        ApplyFilters();
+    }
+
+    private void FilterByCar(ChangeEventArgs e)
+    {
+        carFilter = e.Value?.ToString();
+        ApplyFilters();
+    }
+
+    private void FilterByDateFrom(ChangeEventArgs e)
+    {
+        dateFromFilter = string.IsNullOrEmpty(e.Value?.ToString()) ? null : DateTime.Parse(e.Value.ToString()!);
+        ApplyFilters();
+    }
+
+    private void FilterByDateTo(ChangeEventArgs e)
+    {
+        dateToFilter = string.IsNullOrEmpty(e.Value?.ToString()) ? null : DateTime.Parse(e.Value.ToString()!);
+        ApplyFilters();
+    }
+
+    private string GetStatusText(ReservationStatus status)
+    {
+        return status switch
+        {
+            ReservationStatus.Active => "Aktywna",
+            ReservationStatus.Cancelled => "Anulowana",
+            ReservationStatus.Finished => "Zakończona",
+            _ => "Nieznany"
+        };
+    }
+
+    private string GetStatusBadgeClass(ReservationStatus status)
+    {
+        return status switch
+        {
+            ReservationStatus.Active => "bg-success",
+            ReservationStatus.Cancelled => "bg-warning",
+            ReservationStatus.Finished => "bg-secondary",
+            _ => "bg-light"
+        };
+    }
+
+    private string GetRowClass(Reservation reservation)
+    {
+        return reservation.Status switch
+        {
+            ReservationStatus.Active => "table-success",
+            ReservationStatus.Cancelled => "table-warning",
+            _ => ""
+        };
+    }
+
+    private void ViewDetails(Reservation reservation)
+    {
+        selectedReservation = reservation;
+    }
+
+    private void CloseDetails()
+    {
+        selectedReservation = null;
+    }
+
+    private async Task CancelReservation(int id)
+    {
+        var reservation = await Db.Reservations.FirstOrDefaultAsync(r => r.Id == id);
+        if (reservation != null && reservation.Status == ReservationStatus.Active)
+        {
+            reservation.Status = ReservationStatus.Cancelled;
+
+            // Przywróć dostępność samochodu
+            if (int.TryParse(reservation.CarId, out var carId))
+            {
+                var car = await Db.Cars.FindAsync(carId);
+                if (car != null)
+                {
+                    car.IsAvailable = true;
+                }
+            }
+
+            await Db.SaveChangesAsync();
+            await LoadData();
+            CloseDetails();
+        }
+    }
+
+    private async Task DeleteReservation(int id)
+    {
+        var reservation = await Db.Reservations.FirstOrDefaultAsync(r => r.Id == id);
+        if (reservation != null)
+        {
+            // Przywróć dostępność samochodu jeśli rezerwacja była aktywna
+            if (reservation.Status == ReservationStatus.Active && int.TryParse(reservation.CarId, out var carId))
+            {
+                var car = await Db.Cars.FindAsync(carId);
+                if (car != null)
+                {
+                    car.IsAvailable = true;
+                }
+            }
+
+            Db.Reservations.Remove(reservation);
+            await Db.SaveChangesAsync();
+            await LoadData();
+        }
+    }
+}

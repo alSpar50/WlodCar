@@ -7,44 +7,46 @@
 
 <PageTitle>Dostępne samochody</PageTitle>
 
-@if (error is not null)
-{
-    <div class="alert alert-danger">@error</div>
-}
-else
-{
-    <h3 class="mb-4">
-        Dostępne auta
-        @if (!string.IsNullOrWhiteSpace(loc))
-        {
-            <text>w: <b>@loc</b>, </text>
-        }
-        @from:dd.MM.yyyy – @to:dd.MM.yyyy
-    </h3>
-
-    @if (!cars.Any())
+<div class="container my-5">
+    @if (error is not null)
     {
-        <div class="alert alert-warning">Brak wolnych pojazdów.</div>
+        <div class="alert alert-danger">@error</div>
     }
     else
     {
-        <div class="row row-cols-1 row-cols-md-3 g-4">
-            @foreach (var c in cars)
+        <h3 class="mb-4">
+            Dostępne auta
+            @if (!string.IsNullOrWhiteSpace(loc))
             {
-                <div class="col">
-                    <div class="card h-100 text-center">
-                        <img src="@c.Img" class="card-img-top" />
-                        <div class="card-body">
-                            <h6>@c.Name</h6>
-                            <p class="fw-bold mb-2">@c.PricePerDay:0.00 PLN / dzień</p>
-                            <a class="btn btn-primary" href="/rezerwacja">Rezerwuj</a>
+                <text>w: <b>@loc</b>, </text>
+            }
+            @from:dd.MM.yyyy -- @to:dd.MM.yyyy
+        </h3>
+
+        @if (!cars.Any())
+        {
+            <div class="alert alert-warning">Brak wolnych pojazdów.</div>
+        }
+        else
+        {
+            <div class="row row-cols-1 row-cols-md-3 g-4 mb-5">
+                @foreach (var c in cars)
+                {
+                    <div class="col">
+                        <div class="card h-100 text-center">
+                            <img src="@c.Img" class="card-img-top" />
+                            <div class="card-body">
+                                <h6>@c.Name</h6>
+                                <p class="fw-bold mb-2">@c.PricePerDay:0.00 PLN / dzień</p>
+                                <a class="btn btn-primary" href="/rezerwacja">Rezerwuj</a>
+                            </div>
                         </div>
                     </div>
-                </div>
-            }
-        </div>
+                }
+            </div>
+        }
     }
-}
+</div>
 
 @code {
     [SupplyParameterFromQuery] public string? loc { get; set; }
@@ -75,17 +77,18 @@ else
                            .ToListAsync();
 
         /* lista aut + opcjonalny filtr lokalizacji */
-        var query = Db.Cars.Where(c => c.IsAvailable);
+        // POPRAWKA: Dodaj filtrowanie samochodów w serwisie
+        var query = Db.Cars.Where(c => c.IsAvailable && !c.InService);
 
         /* Jeśli kiedyś dodasz kolumnę Location w tabeli Cars,
-        wstaw filtr z powrotem – na razie go pomijamy.  */
+        wstaw filtr z powrotem -- na razie go pomijamy.  */
 
-                    /* pobierz do pamięci */
-                    cars = await query
-                              .AsNoTracking()
-                              .ToListAsync();
+        /* pobierz do pamięci */
+        cars = await query
+                  .AsNoTracking()
+                  .ToListAsync();
 
-        /* odfiltrowanie zajętych – ToString tylko w .NET-cie */
+        /* odfiltrowanie zajętych -- ToString tylko w .NET-cie */
         cars = cars.Where(c => !busy.Contains(c.Id.ToString()))
                    .ToList();
     }

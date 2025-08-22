@@ -1,36 +1,56 @@
 ﻿@using WlodCar.Services
+@using WlodCar.Data.Entities
+@using Microsoft.EntityFrameworkCore
 @using System.Security.Claims
 @inject ReservationState State
 @inject IReservationService ReservationService
 @inject AuthenticationStateProvider Auth
+@inject ApplicationDbContext Db
 
-<h5 class="mb-3">Krok 2 – wybierz samochód</h5>
+<h5 class="mb-3">Krok 2 -- wybierz samochód</h5>
 
 @if (error is not null)
 {
     <div class="alert alert-danger">@error</div>
 }
 
-<div class="row row-cols-1 row-cols-md-3 g-3">
-    @foreach (var c in Cars)
-    {
-        <div class="col">
-            <div class="card h-100 text-center">
-                <img src="@c.Img" class="card-img-top" />
-                <div class="card-body">
-                    <h6>@c.Name</h6>
-                    <p class="fw-bold">@c.PricePerDay:0.00 PLN / dzień</p>
+@if (Cars == null)
+{
+    <div class="text-center">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Ładowanie samochodów...</span>
+        </div>
+    </div>
+}
+else if (!Cars.Any())
+{
+    <div class="alert alert-warning">
+        <i class="bi bi-exclamation-triangle"></i> Brak dostępnych samochodów w tym terminie.
+    </div>
+}
+else
+{
+    <div class="row row-cols-1 row-cols-md-3 g-3">
+        @foreach (var c in Cars)
+        {
+            <div class="col">
+                <div class="card h-100 text-center">
+                    <img src="@c.Img" class="card-img-top" style="height: 200px; object-fit: cover;" />
+                    <div class="card-body">
+                        <h6>@c.Name</h6>
+                        <p class="fw-bold">@c.PricePerDay.ToString("0.00") PLN / dzień</p>
 
-                    <button class="btn btn-primary"
-                            disabled="@busy"
-                            @onclick="() => Select(c)">
-                        Wybierz
-                    </button>
+                        <button class="btn btn-primary"
+                                disabled="@busy"
+                                @onclick="() => Select(c)">
+                            Wybierz
+                        </button>
+                    </div>
                 </div>
             </div>
-        </div>
-    }
-</div>
+        }
+    </div>
+}
 
 <div class="d-flex justify-content-between mt-4">
     <button class="btn btn-outline-secondary" @onclick="OnPrev">Wstecz</button>
@@ -40,21 +60,104 @@
     [Parameter] public EventCallback OnNext { get; set; }
     [Parameter] public EventCallback OnPrev { get; set; }
 
-    private readonly List<CarVm> Cars =
-        [
-        new("1","Skoda Fabia",110,"images/cars/fabia.png"),
-        new("2","Audi A3",     145,"images/cars/a3.png"),
-        new("3","Mercedes GLA",180,"images/cars/gla.png")
-    ];
-
+    private List<CarVm>? Cars;
     private bool busy = false;
     private string? error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAvailableCars();
+    }
+
+    private async Task LoadAvailableCars()
+    {
+        try
+        {
+            // Pobierz wszystkie samochody które są dostępne i nie są w serwisie
+            var dbCars = await Db.Cars
+                .Where(c => c.IsAvailable && !c.InService)
+                .OrderBy(c => c.PricePerDay)
+                .ToListAsync();
+
+            Cars = new List<CarVm>();
+
+            // Sprawdź dostępność każdego samochodu w wybranym terminie
+            if (State.PickupDate.HasValue && State.ReturnDate.HasValue)
+            {
+                foreach (var car in dbCars)
+                {
+                    var isAvailable = await ReservationService.IsCarAvailable(
+                        car.Id.ToString(),
+                        State.PickupDate.Value,
+                        State.ReturnDate.Value);
+
+                    if (isAvailable)
+                    {
+                        Cars.Add(new CarVm(
+                            car.Id.ToString(),
+                            car.Name,
+                            car.PricePerDay,
+                            car.Img
+                        ));
+                    }
+                }
+            }
+            else
+            {
+                // Jeśli daty nie są jeszcze wybrane, pokaż wszystkie dostępne
+                Cars = dbCars.Select(c => new CarVm(
+                    c.Id.ToString(),
+                    c.Name,
+                    c.PricePerDay,
+                    c.Img
+                )).ToList();
+            }
+
+            // Dodaj także stare samochody jeśli nie ma ich w bazie (dla kompatybilności)
+            // To pozwoli zachować istniejące dane jeśli baza jest pusta
+            if (!Cars.Any())
+            {
+                var defaultCars = new List<CarVm>
+                {
+                    new("1", "Skoda Fabia", 110, "images/cars/fabia.png"),
+                    new("2", "Audi A3", 145, "images/cars/a3.png"),
+                    new("3", "Mercedes GLA", 180, "images/cars/gla.png")
+                };
+
+                // Sprawdź które z domyślnych są dostępne
+                foreach (var car in defaultCars)
+                {
+                    if (State.PickupDate.HasValue && State.ReturnDate.HasValue)
+                    {
+                        var isAvailable = await ReservationService.IsCarAvailable(
+                            car.Id,
+                            State.PickupDate.Value,
+                            State.ReturnDate.Value);
+
+                        if (isAvailable)
+                        {
+                            Cars.Add(car);
+                        }
+                    }
+                    else
+                    {
+                        Cars.Add(car);
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            error = $"Błąd podczas ładowania samochodów: {ex.Message}";
+            Cars = new List<CarVm>();
+        }
+    }
 
     private async Task Select(CarVm car)
     {
         error = null;
 
-        // podstawowa walidacja stanu – jeśli coś jest puste, nie idź dalej
+        // podstawowa walidacja stanu -- jeśli coś jest puste, nie idź dalej
         if (State.PickupDate is null || State.ReturnDate is null)
         {
             error = "Najpierw uzupełnij daty w kroku 1.";

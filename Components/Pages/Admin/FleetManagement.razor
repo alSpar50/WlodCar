@@ -1,0 +1,593 @@
+﻿@page "/admin/fleet"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using Microsoft.EntityFrameworkCore
+@using WlodCar.Data.Entities
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Forms
+@using System.ComponentModel.DataAnnotations
+@inject ApplicationDbContext Db
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Nav
+@inject IWebHostEnvironment Env
+
+<PageTitle>Zarządzanie flotą - WlodCar</PageTitle>
+
+@if (!isAdmin)
+{
+    <div class="alert alert-danger">
+        <i class="bi bi-exclamation-triangle"></i> Brak uprawnień do tej strony.
+    </div>
+}
+else
+{
+    <div class="container my-4">
+        <h2 class="mb-4">
+            <i class="bi bi-car-front"></i> Zarządzanie flotą
+        </h2>
+
+        <!-- Przycisk dodawania nowego samochodu -->
+        <button class="btn btn-success mb-3" @onclick="ShowAddCar">
+            <i class="bi bi-plus-circle"></i> Dodaj nowy samochód
+        </button>
+
+        <!-- Formularz dodawania/edycji -->
+        @if (showForm)
+        {
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    @(editingCar == null ? "Dodaj nowy samochód" : "Edytuj samochód")
+                </div>
+                <div class="card-body">
+                    <!-- Komunikaty błędów -->
+                    @if (!string.IsNullOrEmpty(errorMessage))
+                    {
+                        <div class="alert alert-danger alert-dismissible fade show">
+                            <i class="bi bi-exclamation-triangle"></i> @errorMessage
+                            <button type="button" class="btn-close" @onclick="() => errorMessage = null"></button>
+                        </div>
+                    }
+
+                    @if (!string.IsNullOrEmpty(warningMessage))
+                    {
+                        <div class="alert alert-warning alert-dismissible fade show">
+                            <i class="bi bi-exclamation-circle"></i> @warningMessage
+                            <button type="button" class="btn-close" @onclick="() => warningMessage = null"></button>
+                        </div>
+                    }
+
+                    <EditForm Model="@formModel" OnValidSubmit="SaveCar">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary class="text-danger" />
+
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Numer rejestracyjny</label>
+                                <InputText class="form-control" @bind-Value="formModel.RegistrationNumber"
+                                           @onblur="CheckRegistrationNumber" />
+                                @if (registrationExists)
+                                {
+                                    <div class="text-danger small mt-1">
+                                        <i class="bi bi-exclamation-circle"></i> Ten numer rejestracyjny już istnieje!
+                                    </div>
+                                }
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Marka</label>
+                                <InputText class="form-control" @bind-Value="formModel.Brand" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Model</label>
+                                <InputText class="form-control" @bind-Value="formModel.Model" />
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Liczba miejsc</label>
+                                <InputNumber class="form-control" @bind-Value="formModel.Seats" />
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Cena za dobę (PLN)</label>
+                                <InputNumber class="form-control" @bind-Value="formModel.PricePerDay" />
+                            </div>
+
+                            <!-- Sekcja zdjęcia -->
+                            <div class="col-12">
+                                <label class="form-label">Zdjęcie samochodu</label>
+                                <div class="d-flex align-items-center gap-3">
+                                    @if (!string.IsNullOrEmpty(currentImageUrl))
+                                    {
+                                        <img src="@currentImageUrl" alt="Podgląd" style="max-height: 150px; max-width: 200px;" class="border rounded" />
+                                    }
+                                    <div>
+                                        <InputFile OnChange="HandleImageUpload" accept="image/*" class="form-control" />
+                                        @if (!string.IsNullOrEmpty(imageUploadError))
+                                        {
+                                            <div class="text-danger small mt-1">@imageUploadError</div>
+                                        }
+                                        <small class="text-muted">Max 5MB, formaty: JPG, PNG, GIF</small>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label">Data ostatniego serwisu</label>
+                                <InputDate class="form-control" @bind-Value="formModel.LastServiceDate" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Data następnego serwisu</label>
+                                <InputDate class="form-control" @bind-Value="formModel.NextServiceDate"
+                                           @onblur="CheckServiceDate" />
+                                @if (serviceOverdue)
+                                {
+                                    <div class="text-warning small mt-1">
+                                        <i class="bi bi-exclamation-triangle"></i>
+                                        Uwaga! Ta data już minęła - samochód wymaga natychmiastowego serwisu!
+                                    </div>
+                                }
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Notatki serwisowe</label>
+                                <InputTextArea class="form-control" rows="3" @bind-Value="formModel.ServiceNotes" />
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <InputCheckbox class="form-check-input" @bind-Value="formModel.IsAvailable" />
+                                    <label class="form-check-label">Dostępny do wypożyczenia</label>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <InputCheckbox class="form-check-input" @bind-Value="formModel.InService" />
+                                    <label class="form-check-label text-warning">W serwisie</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mt-3">
+                            <button type="submit" class="btn btn-primary" disabled="@registrationExists">
+                                <i class="bi bi-save"></i> Zapisz
+                            </button>
+                            <button type="button" class="btn btn-secondary" @onclick="CancelEdit">
+                                Anuluj
+                            </button>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        }
+
+        @if (saveMessage != null)
+        {
+            <div class="alert alert-success alert-dismissible fade show">
+                <i class="bi bi-check-circle"></i> @saveMessage
+                <button type="button" class="btn-close" @onclick="() => saveMessage = null"></button>
+            </div>
+        }
+
+        <!-- Lista samochodów -->
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Lista samochodów (@(cars?.Count ?? 0))</h5>
+                <div>
+                    @if (cars?.Any(c => c.NextServiceDate < DateTime.Now) == true)
+                    {
+                        <span class="badge bg-danger">
+                            <i class="bi bi-exclamation-triangle"></i>
+                            @cars.Count(c => c.NextServiceDate < DateTime.Now) z przeterminowanym serwisem
+                        </span>
+                    }
+                </div>
+            </div>
+            <div class="card-body">
+                @if (cars == null)
+                {
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Ładowanie...</span>
+                    </div>
+                }
+                else if (!cars.Any())
+                {
+                    <p>Brak samochodów w bazie.</p>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Zdjęcie</th>
+                                    <th>Nr rej.</th>
+                                    <th>Marka</th>
+                                    <th>Model</th>
+                                    <th>Miejsca</th>
+                                    <th>Cena/doba</th>
+                                    <th>Status</th>
+                                    <th>Serwis</th>
+                                    <th>Akcje</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var car in cars)
+                                {
+                                    <tr class="@(car.NextServiceDate < DateTime.Now ? "table-warning" : "")">
+                                        <td>
+                                            <img src="@car.Img" alt="@car.Name" style="height: 40px; width: auto;" class="rounded" />
+                                        </td>
+                                        <td><strong>@car.RegistrationNumber</strong></td>
+                                        <td>@car.Brand</td>
+                                        <td>@car.Model</td>
+                                        <td>@car.Seats</td>
+                                        <td>@car.PricePerDay PLN</td>
+                                        <td>
+                                            @if (car.InService)
+                                            {
+                                                <span class="badge bg-warning">W serwisie</span>
+                                            }
+                                            else if (car.NextServiceDate < DateTime.Now)
+                                            {
+                                                <span class="badge bg-danger">Wymaga serwisu!</span>
+                                            }
+                                            else if (car.IsAvailable)
+                                            {
+                                                <span class="badge bg-success">Dostępny</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-danger">Niedostępny</span>
+                                            }
+                                        </td>
+                                        <td>
+                                            @if (car.NextServiceDate.HasValue)
+                                            {
+                                                @if (car.NextServiceDate < DateTime.Now)
+                                                {
+                                                    <small class="text-danger fw-bold">
+                                                        <i class="bi bi-exclamation-triangle"></i>
+                                                        @car.NextServiceDate.Value.ToString("dd.MM.yyyy")
+                                                    </small>
+                                                }
+                                                else
+                                                {
+                                                    <small>@car.NextServiceDate.Value.ToString("dd.MM.yyyy")</small>
+                                                }
+                                            }
+                                            else
+                                            {
+                                                <small class="text-muted">-</small>
+                                            }
+                                        </td>
+                                        <td>
+                                            <button class="btn btn-sm btn-outline-primary" @onclick="() => EditCar(car)">
+                                                <i class="bi bi-pencil"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteCar(car.Id)">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private bool isAdmin = false;
+    private List<Car>? cars;
+    private bool showForm = false;
+    private Car? editingCar = null;
+    private CarFormModel formModel = new();
+    private string? saveMessage;
+    private string? errorMessage;
+    private string? warningMessage;
+    private string? imageUploadError;
+    private string? currentImageUrl;
+    private string? uploadedImageFileName;
+    private const long MaxImageSize = 5 * 1024 * 1024; // 5MB
+    private bool registrationExists = false;
+    private bool serviceOverdue = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var userEmail = authState.User?.Identity?.Name;
+        isAdmin = userEmail?.Contains("@wlodcar", StringComparison.OrdinalIgnoreCase) ?? false;
+
+        if (!isAdmin)
+        {
+            Nav.NavigateTo("/");
+            return;
+        }
+
+        await LoadCars();
+    }
+
+    private async Task LoadCars()
+    {
+        try
+        {
+            cars = await Db.Cars.OrderBy(c => c.Brand).ThenBy(c => c.Model).ToListAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Błąd podczas ładowania samochodów: {ex.Message}";
+        }
+    }
+
+    private async Task CheckRegistrationNumber()
+    {
+        if (string.IsNullOrWhiteSpace(formModel.RegistrationNumber))
+        {
+            registrationExists = false;
+            return;
+        }
+
+        // Sprawdź czy numer rejestracyjny już istnieje (ale nie dla edytowanego samochodu)
+        registrationExists = await Db.Cars.AnyAsync(c =>
+            c.RegistrationNumber == formModel.RegistrationNumber &&
+            (editingCar == null || c.Id != editingCar.Id));
+    }
+
+    private void CheckServiceDate()
+    {
+        serviceOverdue = formModel.NextServiceDate.HasValue &&
+                        formModel.NextServiceDate.Value.Date < DateTime.Now.Date;
+    }
+
+    private void ShowAddCar()
+    {
+        formModel = new CarFormModel();
+        editingCar = null;
+        showForm = true;
+        currentImageUrl = null;
+        uploadedImageFileName = null;
+        registrationExists = false;
+        serviceOverdue = false;
+        errorMessage = null;
+        warningMessage = null;
+    }
+
+    private void EditCar(Car car)
+    {
+        editingCar = car;
+        formModel = new CarFormModel
+        {
+            RegistrationNumber = car.RegistrationNumber,
+            Brand = car.Brand,
+            Model = car.Model,
+            Seats = car.Seats,
+            PricePerDay = car.PricePerDay,
+            IsAvailable = car.IsAvailable,
+            LastServiceDate = car.LastServiceDate,
+            NextServiceDate = car.NextServiceDate,
+            ServiceNotes = car.ServiceNotes,
+            InService = car.InService
+        };
+        currentImageUrl = car.Img;
+        uploadedImageFileName = car.ImageFileName;
+        showForm = true;
+        registrationExists = false;
+        CheckServiceDate();
+        errorMessage = null;
+        warningMessage = null;
+    }
+
+    private async Task HandleImageUpload(InputFileChangeEventArgs e)
+    {
+        imageUploadError = null;
+        var file = e.File;
+
+        if (file == null) return;
+
+        if (file.Size > MaxImageSize)
+        {
+            imageUploadError = "Plik jest większy niż 5MB";
+            return;
+        }
+
+        var ext = Path.GetExtension(file.Name).ToLowerInvariant();
+        if (!new[] { ".jpg", ".jpeg", ".png", ".gif" }.Contains(ext))
+        {
+            imageUploadError = "Dozwolone formaty: JPG, PNG, GIF";
+            return;
+        }
+
+        try
+        {
+            var fileName = $"car_{Guid.NewGuid()}{ext}";
+            var path = Path.Combine(Env.WebRootPath, "uploads", "cars", fileName);
+
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+
+            await using var fs = File.Create(path);
+            await file.OpenReadStream(MaxImageSize).CopyToAsync(fs);
+
+            uploadedImageFileName = fileName;
+            currentImageUrl = $"/uploads/cars/{fileName}";
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            imageUploadError = $"Błąd podczas wgrywania pliku: {ex.Message}";
+        }
+    }
+
+    private async Task SaveCar()
+    {
+        errorMessage = null;
+        warningMessage = null;
+
+        try
+        {
+            // Sprawdź ponownie numer rejestracyjny
+            await CheckRegistrationNumber();
+            if (registrationExists)
+            {
+                errorMessage = "Nie można zapisać - samochód o tym numerze rejestracyjnym już istnieje!";
+                return;
+            }
+
+            // Ostrzeżenie o przeterminowanym serwisie
+            if (serviceOverdue)
+            {
+                warningMessage = "Uwaga: Data następnego serwisu już minęła. Samochód wymaga natychmiastowego przeglądu!";
+            }
+
+            if (editingCar == null)
+            {
+                // Dodawanie nowego
+                var newCar = new Car
+                {
+                    RegistrationNumber = formModel.RegistrationNumber!,
+                    Brand = formModel.Brand!,
+                    Model = formModel.Model!,
+                    Seats = formModel.Seats,
+                    PricePerDay = formModel.PricePerDay,
+                    IsAvailable = formModel.IsAvailable,
+                    LastServiceDate = formModel.LastServiceDate,
+                    NextServiceDate = formModel.NextServiceDate,
+                    ServiceNotes = formModel.ServiceNotes,
+                    InService = formModel.InService || serviceOverdue, // Automatycznie ustaw "W serwisie" jeśli data minęła
+                    ImageFileName = uploadedImageFileName
+                };
+
+                Db.Cars.Add(newCar);
+                await Db.SaveChangesAsync();
+
+                saveMessage = $"Samochód {newCar.Brand} {newCar.Model} ({newCar.RegistrationNumber}) został dodany.";
+
+                if (serviceOverdue)
+                {
+                    saveMessage += " UWAGA: Samochód wymaga natychmiastowego serwisu!";
+                }
+            }
+            else
+            {
+                // Edycja istniejącego
+                editingCar.RegistrationNumber = formModel.RegistrationNumber!;
+                editingCar.Brand = formModel.Brand!;
+                editingCar.Model = formModel.Model!;
+                editingCar.Seats = formModel.Seats;
+                editingCar.PricePerDay = formModel.PricePerDay;
+                editingCar.IsAvailable = formModel.IsAvailable;
+                editingCar.LastServiceDate = formModel.LastServiceDate;
+                editingCar.NextServiceDate = formModel.NextServiceDate;
+                editingCar.ServiceNotes = formModel.ServiceNotes;
+                editingCar.InService = formModel.InService || serviceOverdue;
+
+                if (!string.IsNullOrEmpty(uploadedImageFileName))
+                {
+                    if (!string.IsNullOrEmpty(editingCar.ImageFileName))
+                    {
+                        var oldPath = Path.Combine(Env.WebRootPath, "uploads", "cars", editingCar.ImageFileName);
+                        if (File.Exists(oldPath))
+                            File.Delete(oldPath);
+                    }
+                    editingCar.ImageFileName = uploadedImageFileName;
+                }
+
+                await Db.SaveChangesAsync();
+                saveMessage = $"Samochód {editingCar.Brand} {editingCar.Model} został zaktualizowany.";
+
+                if (serviceOverdue)
+                {
+                    saveMessage += " UWAGA: Samochód wymaga natychmiastowego serwisu!";
+                }
+            }
+
+            await LoadCars();
+            showForm = false;
+            editingCar = null;
+            uploadedImageFileName = null;
+        }
+        catch (DbUpdateException dbEx)
+        {
+            if (dbEx.InnerException?.Message.Contains("UNIQUE") == true ||
+                dbEx.InnerException?.Message.Contains("duplicate") == true)
+            {
+                errorMessage = "Samochód o tym numerze rejestracyjnym już istnieje w bazie!";
+            }
+            else
+            {
+                errorMessage = $"Błąd bazy danych: {dbEx.InnerException?.Message ?? dbEx.Message}";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Błąd podczas zapisywania: {ex.Message}";
+        }
+    }
+
+    private void CancelEdit()
+    {
+        if (!string.IsNullOrEmpty(uploadedImageFileName) && editingCar == null)
+        {
+            var path = Path.Combine(Env.WebRootPath, "uploads", "cars", uploadedImageFileName);
+            if (File.Exists(path))
+                File.Delete(path);
+        }
+
+        showForm = false;
+        editingCar = null;
+        uploadedImageFileName = null;
+        currentImageUrl = null;
+        registrationExists = false;
+        serviceOverdue = false;
+        errorMessage = null;
+        warningMessage = null;
+    }
+
+    private async Task DeleteCar(int id)
+    {
+        var car = await Db.Cars.FindAsync(id);
+        if (car != null)
+        {
+            try
+            {
+                if (!string.IsNullOrEmpty(car.ImageFileName))
+                {
+                    var path = Path.Combine(Env.WebRootPath, "uploads", "cars", car.ImageFileName);
+                    if (File.Exists(path))
+                        File.Delete(path);
+                }
+
+                Db.Cars.Remove(car);
+                await Db.SaveChangesAsync();
+                await LoadCars();
+                saveMessage = $"Samochód {car.Brand} {car.Model} ({car.RegistrationNumber}) został usunięty.";
+            }
+            catch (Exception ex)
+            {
+                errorMessage = $"Błąd podczas usuwania: {ex.Message}";
+            }
+        }
+    }
+
+    private class CarFormModel
+    {
+        [Required(ErrorMessage = "Numer rejestracyjny jest wymagany")]
+        [StringLength(32, ErrorMessage = "Numer rejestracyjny nie może przekraczać 32 znaków")]
+        public string? RegistrationNumber { get; set; }
+
+        [Required(ErrorMessage = "Marka jest wymagana")]
+        public string? Brand { get; set; }
+
+        [Required(ErrorMessage = "Model jest wymagany")]
+        public string? Model { get; set; }
+
+        [Range(1, 9, ErrorMessage = "Liczba miejsc musi być między 1 a 9")]
+        public int Seats { get; set; } = 5;
+
+        [Range(0, 9999, ErrorMessage = "Cena musi być między 0 a 9999")]
+        public decimal PricePerDay { get; set; } = 100;
+
+        public bool IsAvailable { get; set; } = true;
+        public DateTime? LastServiceDate { get; set; }
+        public DateTime? NextServiceDate { get; set; }
+        public string? ServiceNotes { get; set; }
+        public bool InService { get; set; } = false;
+    }
+}

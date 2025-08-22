@@ -1,53 +1,40 @@
-﻿@using System.ComponentModel.DataAnnotations
-@using WlodCar.Services
+﻿@using WlodCar.Services
 @inject ReservationState State
 
-<EditForm Model="M" OnValidSubmit="Next" FormName="step1">
+<h5 class="mb-3">Krok 1 - wybierz termin i miejsce</h5>
+
+<EditForm Model="@State" OnValidSubmit="OnNext">
     <DataAnnotationsValidator />
+    <ValidationSummary class="text-danger" />
 
-    <div class="row g-3">
-        <div class="col-md-4">
-            <label class="form-label">Miejsce odbioru</label>
-            <InputText class="form-control" @bind-Value="M.Location" />
-            <ValidationMessage For="@(()=>M.Location)" />
-        </div>
+    <div class="mb-3">
+        <label class="form-label">Miejsce odbioru</label>
+        <InputSelect class="form-select" @bind-Value="State.PickupLocation">
+            <option value="">-- Wybierz lokalizację --</option>
+            <option value="Płock">Płock</option>
+            <option value="Iława">Iława</option>
+            <option value="Wyszków">Wyszków</option>
+        </InputSelect>
+        <ValidationMessage For="() => State.PickupLocation" class="text-danger" />
+    </div>
 
-        <div class="col-md-3">
-            <label class="form-label">Data odbioru</label>
-            <InputDate class="form-control" @bind-Value="M.DateFrom" />
-            <ValidationMessage For="@(()=>M.DateFrom)" />
-        </div>
+    <div class="mb-3">
+        <label class="form-label">Data odbioru</label>
+        <InputDate class="form-control" @bind-Value="State.PickupDate" />
+        <ValidationMessage For="() => State.PickupDate" class="text-danger" />
+    </div>
 
-        <div class="col-md-3">
-            <label class="form-label">Data zwrotu</label>
-            <InputDate class="form-control" @bind-Value="M.DateTo" />
-            <ValidationMessage For="@(()=>M.DateTo)" />
-        </div>
+    <div class="mb-3">
+        <label class="form-label">Data zwrotu</label>
+        <InputDate class="form-control" @bind-Value="State.ReturnDate" />
+        <ValidationMessage For="() => State.ReturnDate" class="text-danger" />
+    </div>
 
-        <div class="col-md-2 d-flex align-items-end">
-            <button class="btn btn-primary w-100">Znajdź</button>
-        </div>
+    <div class="d-flex justify-content-end">
+        <button type="submit" class="btn btn-primary">Dalej</button>
     </div>
 </EditForm>
 
 @code {
     [Parameter] public EventCallback OnNext { get; set; }
-
-    private Model M = new();
-
-    private async Task Next()
-    {
-        State.PickupLocation = M.Location;
-        State.PickupDate = M.DateFrom;
-        State.ReturnDate = M.DateTo;
-
-        await OnNext.InvokeAsync();
-    }
-
-    class Model
-    {
-        [Required] public string? Location { get; set; }
-        [Required] public DateTime? DateFrom { get; set; }
-        [Required] public DateTime? DateTo { get; set; }
-    }
 }

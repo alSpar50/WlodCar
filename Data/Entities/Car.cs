@@ -19,24 +19,30 @@ public class Car
 
     public bool IsAvailable { get; set; } = true;
 
+    // Nowe pola dla zarządzania flotą
+    public DateTime? LastServiceDate { get; set; }
+    public DateTime? NextServiceDate { get; set; }
+    public string? ServiceNotes { get; set; }
+    public bool InService { get; set; } = false;
+
+    // Pole do przechowywania nazwy pliku zdjęcia
+    public string? ImageFileName { get; set; }
+
     public ICollection<Reservation> Reservations { get; set; } = [];
 
-    /* ──────────────────────────────────────────────────────────
-       Alias-właściwości tylko do warstwy prezentacji (UI).
-       EF Core NIE utworzy dla nich kolumn – dzięki atrybutowi
-       [NotMapped].                                                  */
-
-    /// <summary>Pełna nazwa widoczna w ofercie (Brand + Model)</summary>
     [NotMapped]
     public string Name => $"{Brand} {Model}";
 
-    /// <summary>Ścieżka do zdjęcia w wwwroot/images/cars/…</summary>
     [NotMapped]
     public string Img
     {
         get
         {
-            // plik np. images/cars/fabia.png
+            // Jeśli mamy wgrane zdjęcie, użyj go
+            if (!string.IsNullOrEmpty(ImageFileName))
+                return $"/uploads/cars/{ImageFileName}";
+
+            // W przeciwnym razie użyj domyślnego
             var file = Model.Replace(" ", "").ToLowerInvariant() + ".png";
             return $"images/cars/{file}";
         }

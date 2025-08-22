@@ -9,19 +9,19 @@
 @using System.Globalization
 @inject ApplicationDbContext Db
 
-<PageTitle>WlodCar – Oferta</PageTitle>
+<PageTitle>WlodCar -- Oferta</PageTitle>
 
 <!-- ─────────────────────────── HERO / INTRO ─────────────────────────── -->
 <section class="bg-light py-5 mb-5">
     <div class="container text-center">
         <h1 class="display-4 fw-bold mb-3">
-            <span class="text-wlodcar">WlodCar</span> – pasja Pawła Włodkowica
+            <span class="text-wlodcar">WlodCar</span> -- pasja Pawła Włodkowica
         </h1>
         <p class="lead mx-auto" style="max-width: 720px;">
             Od <strong>1313&nbsp;r.</strong>, gdy Paweł Włodkowic wyruszył
             w pierwszą podróż dyplomatyczną, minęło wiele wieków,
             ale duch odkrywania pozostał. Dziś jego wizję wolności dróg i
-            otwartości łączymy z nowoczesną flotą samochodów – prosto z
+            otwartości łączymy z nowoczesną flotą samochodów -- prosto z
             <abbr title="Szkoła Wyższa Pawła Włodkowica">SWPW</abbr>
             do Twoich planów.
         </p>
@@ -58,25 +58,39 @@
         <span class="spinner-border spinner-border-sm me-2"></span>Ładuję…
     </div>
 }
-else if (!cars.Any())
+else if (!availableCars.Any())
 {
-    <div class="alert alert-info text-center">Brak dostępnych samochodów.</div>
+    <div class="alert alert-info text-center">Brak dostępnych samochodów w tej chwili.</div>
 }
 else
 {
     <div class="container">
         <div class="card border-0 shadow-lg overflow-hidden position-relative">
-            <div class="car-mosaic">
-                @foreach (var car in cars.Take(3))
+            <div class="car-mosaic @(GetMosaicClass())">
+                @foreach (var car in availableCars.Take(3))
                 {
                     <img src="@car.Img" alt="@car.Name" />
+                }
+                @* Jeśli mamy mniej niż 3 samochody, wypełnij pustym obrazkiem *@
+                @for (int i = availableCars.Count(); i < 3 && i < 3; i++)
+                {
+                    <div class="empty-slot">
+                        <i class="bi bi-car-front display-1 text-muted"></i>
+                    </div>
                 }
             </div>
 
             <div class="card-img-overlay d-flex flex-column justify-content-end p-0">
                 <div class="info-box m-4 m-md-5">
                     <h2 class="text-white fw-bold mb-2">
-                        Trzy klasy – jedna decyzja
+                        @if (availableCars.Count() >= 3)
+                        {
+                            <text>Trzy klasy -- jedna decyzja</text>
+                        }
+                        else
+                        {
+                            <text>Nasza flota czeka na Ciebie</text>
+                        }
                     </h2>
                     <p class="text-white-50 mb-4" style="max-width:420px;">
                         Miejskie <em>City</em>, rodzinne <em>Combi</em>,
@@ -92,6 +106,67 @@ else
         </div>
     </div>
 }
+
+<!-- ─────────────────────────── LISTA WSZYSTKICH SAMOCHODÓW ─────────────────────────── -->
+<section class="container my-5">
+    <h3 class="text-center mb-4">Cała nasza flota</h3>
+
+    @if (cars != null && cars.Any())
+    {
+        <div class="row row-cols-1 row-cols-md-3 row-cols-lg-4 g-4">
+            @foreach (var car in cars)
+            {
+                <div class="col">
+                    <div class="card h-100 @(car.IsAvailable && !car.InService ? "" : "opacity-75")">
+                        <img src="@car.Img" class="card-img-top" style="height: 180px; object-fit: cover;" alt="@car.Name">
+                        <div class="card-body">
+                            <h6 class="card-title">@car.Name</h6>
+                            <p class="mb-2">
+                                <strong class="text-wlodcar">@car.PricePerDay.ToString("0.00") PLN</strong>
+                                <span class="text-muted small">/ doba</span>
+                            </p>
+                            <div class="mb-2">
+                                @if (car.InService)
+                                {
+                                    <span class="badge bg-warning">
+                                        <i class="bi bi-wrench"></i> W serwisie
+                                    </span>
+                                }
+                                else if (!car.IsAvailable)
+                                {
+                                    <span class="badge bg-danger">Niedostępny</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-success">
+                                        <i class="bi bi-check-circle"></i> Dostępny
+                                    </span>
+                                }
+                            </div>
+                            @if (car.NextServiceDate.HasValue && car.NextServiceDate.Value <= DateTime.Now.AddDays(30))
+                            {
+                                <small class="text-muted d-block">
+                                    <i class="bi bi-calendar-check"></i>
+                                    Serwis: @car.NextServiceDate.Value.ToString("dd.MM.yyyy")
+                                </small>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+
+        @if (carsInService.Any())
+        {
+            <div class="alert alert-info mt-4">
+                <i class="bi bi-info-circle"></i>
+                <strong>@carsInService.Count()</strong>
+                @(carsInService.Count() == 1 ? "samochód jest" : "samochody są")
+                obecnie w serwisie i wkrótce @(carsInService.Count() == 1 ? "wróci" : "wrócą") do oferty.
+            </div>
+        }
+    }
+</section>
 
 <!-- ─────────────────────────── CSS ─────────────────────────── -->
 <style>
@@ -119,30 +194,44 @@ else
         height: 360px;
     }
 
-        .car-mosaic img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            filter: brightness(.75);
-            transition: .4s;
+    .car-mosaic-small {
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    }
+
+    .car-mosaic img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        filter: brightness(.75);
+        transition: .4s;
+    }
+
+        .car-mosaic img:hover {
+            filter: brightness(1);
+            transform: scale(1.05);
         }
 
-            .car-mosaic img:hover {
-                filter: brightness(1);
-                transform: scale(1.05);
-            }
+    .car-mosaic .empty-slot {
+        width: 100%;
+        height: 100%;
+        background: #f8f9fa;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        filter: brightness(.75);
+    }
 
     /* ========== overlay ========== */
-    .card-img-overlay { /* NIE ma własnego tła! */
+    .card-img-overlay {
         display: flex;
-        align-items: flex-end; /* ustawiamy wszystko przy dolnej krawędzi */
+        align-items: flex-end;
         justify-content: flex-start;
-        padding: 0; /* margines nadajemy tylko info-boxowi */
+        padding: 0;
     }
 
     /* ========== info-box ========== */
     .info-box {
-        background: rgba(0,0,0,.65); /* ciemny, pół-transparentny */
+        background: rgba(0,0,0,.65);
         border-radius: 1rem;
         padding: 2rem;
         margin: 2rem;
@@ -150,7 +239,7 @@ else
         backdrop-filter: blur(3px);
     }
 
-    /* gradient tylko na XS – nakładany TYLKO na info-box */
+    /* gradient tylko na XS */
     @@media(max-width:575.98px) {
         .info-box {
             background: linear-gradient( to top, rgba(0,0,0,.8) 0%, rgba(0,0,0,.6) 30%, rgba(0,0,0,.0) 100%);
@@ -160,14 +249,26 @@ else
 
 @code {
     private List<Car>? cars;
+    private IEnumerable<Car> availableCars = Enumerable.Empty<Car>();
+    private IEnumerable<Car> carsInService = Enumerable.Empty<Car>();
 
     protected override async Task OnInitializedAsync()
     {
         cars = await Db.Cars
-                       .Where(c => c.IsAvailable)
                        .OrderBy(c => c.Brand)
                        .ThenBy(c => c.Model)
                        .AsNoTracking()
                        .ToListAsync();
+
+        if (cars != null)
+        {
+            availableCars = cars.Where(c => c.IsAvailable && !c.InService);
+            carsInService = cars.Where(c => c.InService);
+        }
+    }
+
+    private string GetMosaicClass()
+    {
+        return availableCars.Count() < 3 ? "car-mosaic-small" : "";
     }
 }
